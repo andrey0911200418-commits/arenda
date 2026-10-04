@@ -1,0 +1,799 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1C2C4C">
+<meta name="theme-color" content="#0C1018" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="АвтоДоговор">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<title>АвтоДоговор</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=Unbounded:wght@600;700&family=PT+Sans+Narrow:wght@700&display=swap">
+<style>
+:root{
+  --bg:#EDEFF3; --surface:#FFFFFF; --surface-2:#F5F6F9; --ink:#121826; --muted:#5B6577; --hair:#DCE1E8;
+  --primary:#1C2C4C; --on-primary:#FFFFFF; --accent:#E8960F; --accent-soft:#FCEFD6; --accent-ink:#8A5300;
+  --good:#1E8A52; --good-soft:#DDF2E6; --warn:#B4560A; --warn-soft:#FBEBD7; --danger:#C0392B; --danger-soft:#F8E0DD;
+  --shadow:0 1px 2px rgba(18,24,38,.06),0 6px 20px rgba(18,24,38,.07);
+  --body:"Golos Text",-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;
+  --display:"Unbounded","Golos Text",-apple-system,system-ui,sans-serif;
+  --plate:"PT Sans Narrow","Arial Narrow",Arial,sans-serif;
+  --tabh:64px;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0C1018; --surface:#151B26; --surface-2:#1B2230; --ink:#E7EBF2; --muted:#94A0B5; --hair:#273042;
+  --primary:#F0A01F; --on-primary:#1A1405; --accent:#F0A01F; --accent-soft:#3A2C10; --accent-ink:#F7C46A;
+  --good:#4CC688; --good-soft:#13301F; --warn:#F0A350; --warn-soft:#3A2A15; --danger:#F07A6C; --danger-soft:#3A1C19;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 24px rgba(0,0,0,.4);
+}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--body);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
+[hidden]{display:none!important}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.app{max-width:640px;margin:0 auto;min-height:100%;padding-bottom:calc(var(--tabh) + 24px + env(safe-area-inset-bottom,0px))}
+.topbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  padding:calc(10px + env(safe-area-inset-top,0px)) 16px 10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--hair)}
+.brand{font-family:var(--display);font-weight:700;font-size:17px;letter-spacing:-.01em}
+.brand i{font-style:normal;color:var(--accent)}
+.topbar .sub{font-size:12.5px;color:var(--muted);margin-left:2px}
+.iconbtn{margin-left:auto;width:40px;height:40px;border-radius:12px;border:1px solid var(--hair);background:var(--surface);display:flex;align-items:center;justify-content:center}
+.iconbtn svg{width:20px;height:20px}
+main{padding:14px 16px 0}
+h2.title{font-family:var(--display);font-weight:600;font-size:20px;margin:6px 0 4px;letter-spacing:-.01em}
+.lead{color:var(--muted);font-size:14px;margin:0 0 14px}
+
+/* tabbar */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--hair);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabbar .in{max-width:640px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);height:var(--tabh)}
+.tab{border:0;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--muted);font-size:11.5px;font-weight:600}
+.tab svg{width:23px;height:23px}
+.tab.on{color:var(--ink)}
+.tab.on svg{color:var(--accent)}
+
+/* stepper */
+.stepper{display:flex;gap:6px;margin:2px 0 14px}
+.st{flex:1;display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:600;color:var(--muted);border:0;background:none;padding:0;text-align:left}
+.st i{height:4px;border-radius:9px;background:var(--hair)}
+.st.done i{background:var(--good)}
+.st.on{color:var(--ink)} .st.on i{background:var(--accent)}
+
+/* cards & lists */
+.card{background:var(--surface);border:1px solid var(--hair);border-radius:16px;padding:14px}
+.stack{display:flex;flex-direction:column;gap:10px}
+.cars{display:grid;grid-template-columns:1fr;gap:10px}
+@media (min-width:560px){.cars{grid-template-columns:1fr 1fr}}
+.car{display:flex;flex-direction:column;gap:9px;text-align:left;background:var(--surface);border:2px solid var(--hair);border-radius:16px;padding:13px 14px;width:100%}
+.car.sel{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.car .nm{font-weight:700;font-size:15.5px}
+.car .mt{font-size:13px;color:var(--muted)}
+.car .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dot{width:12px;height:12px;border-radius:50%;border:1px solid rgba(0,0,0,.25);flex:none}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px;background:var(--surface-2);color:var(--muted)}
+.pill.busy{background:var(--accent-soft);color:var(--accent-ink)}
+.pill.free{background:var(--good-soft);color:var(--good)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.no{background:var(--danger-soft);color:var(--danger)}
+
+/* ГОСТ-номер */
+.plate{display:inline-flex;align-self:flex-start;align-items:stretch;flex:none;background:#fff;color:#111;border:2px solid #111;border-radius:6px;font-family:var(--plate);font-weight:700;line-height:1;overflow:hidden;box-shadow:0 1px 0 rgba(0,0,0,.08)}
+.plate .m{display:flex;align-items:center;gap:3px;padding:4px 8px 3px;font-size:23px;letter-spacing:.02em}
+.plate .m small{font-size:18px}
+.plate .r{display:flex;flex-direction:column;align-items:center;justify-content:center;border-left:2px solid #111;padding:2px 6px;min-width:38px}
+.plate .r b{font-size:17px}
+.plate .r span{display:flex;align-items:center;gap:2px;font-size:8px;letter-spacing:.04em}
+.plate .r span i{display:inline-block;width:10px;height:7px;background:linear-gradient(#fff 33%,#1C47B8 33% 66%,#D52B1E 66%);border:.5px solid #888}
+
+/* forms */
+.grp{margin:16px 0 6px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--muted)}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.f{display:flex;flex-direction:column;gap:5px;min-width:0}
+.f.full{grid-column:1/-1}
+.f label{font-size:13px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.f input,.f textarea,.f select{width:100%;min-height:46px;border:1px solid var(--hair);background:var(--surface);border-radius:12px;padding:10px 12px;font-size:16px}
+.f textarea{min-height:70px;resize:vertical;line-height:1.35}
+.f input:focus,.f textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.f.ok input,.f.ok textarea{border-color:var(--good)}
+.f.check input,.f.check textarea{border-color:var(--warn);background:var(--warn-soft)}
+.b{font-size:11px;font-weight:700;padding:1px 7px;border-radius:99px}
+.b.ok{background:var(--good-soft);color:var(--good)} .b.check{background:var(--warn-soft);color:var(--warn)}
+.hint{font-size:12.5px;color:var(--muted)}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:50px;padding:0 18px;border-radius:14px;border:1px solid var(--hair);background:var(--surface);font-weight:700;font-size:15.5px}
+.btn.pri{background:var(--primary);color:var(--on-primary);border-color:transparent}
+.btn.acc{background:var(--accent);color:#1A1405;border-color:transparent}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 35%,transparent);background:transparent}
+.btn.sm{min-height:38px;padding:0 12px;font-size:13.5px;border-radius:11px}
+.btn.wide{width:100%}
+.btn:active{transform:scale(.985)}
+.btn[disabled]{opacity:.45;pointer-events:none}
+.actions{position:sticky;bottom:calc(var(--tabh) + env(safe-area-inset-bottom,0px));z-index:10;display:flex;gap:10px;padding:12px 0 12px;margin-top:16px;
+  background:linear-gradient(to top,var(--bg) 70%,transparent)}
+.actions .btn{flex:1}
+.actions .btn.ghost{flex:0 0 auto}
+
+/* choice cards */
+.choices{display:grid;gap:10px}
+.choice{display:flex;gap:12px;text-align:left;border:2px solid var(--hair);background:var(--surface);border-radius:16px;padding:14px}
+.choice.sel{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.choice .ic{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:21px;background:var(--surface-2);flex:none}
+.choice b{display:block;font-size:15.5px;margin-bottom:2px}
+.choice span{font-size:13.5px;color:var(--muted)}
+
+/* scan */
+.slots{display:grid;gap:10px}
+.slot{display:grid;grid-template-columns:76px 1fr;gap:12px;align-items:center;background:var(--surface);border:1px dashed var(--hair);border-radius:14px;padding:10px}
+.slot.has{border-style:solid}
+.thumb{width:76px;height:76px;border-radius:10px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:28px}
+.thumb img{width:100%;height:100%;object-fit:cover;transition:transform .2s}
+.slot b{font-size:14.5px;display:block}
+.slot .hint{display:block;margin:2px 0 7px}
+.slot .bt{display:flex;gap:6px;flex-wrap:wrap}
+.filebtn{position:relative;overflow:hidden}
+.filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{border:1px solid var(--hair);background:var(--surface-2);border-radius:99px;padding:8px 12px;font-size:13.5px;min-height:36px}
+.chip.sel{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.addrow{display:flex;gap:8px;margin-top:10px}
+.addrow input{flex:1;min-width:0;min-height:42px;border:1px solid var(--hair);background:var(--surface);border-radius:11px;padding:8px 11px;font-size:16px}
+.tgl{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--hair);border-radius:14px;padding:12px 14px;font-weight:600;grid-column:1/-1}
+.tgl input{width:22px;height:22px;accent-color:var(--accent);flex:none}
+.tgl span{font-weight:400;font-size:13px;color:var(--muted);display:block}
+.banner{border-radius:14px;padding:12px 14px;font-size:14px;margin:10px 0}
+.banner.warn{background:var(--warn-soft);color:var(--ink);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent)}
+.banner.info{background:var(--accent-soft);color:var(--ink);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent)}
+.banner.good{background:var(--good-soft);color:var(--ink);border:1px solid color-mix(in srgb,var(--good) 30%,transparent)}
+.banner b{font-weight:700}
+.banner .btn{display:flex;width:max-content;margin-top:10px}
+
+/* driver list */
+.drv{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--surface);border:2px solid var(--hair);border-radius:14px;padding:11px 13px}
+.drv.sel{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.ava{width:40px;height:40px;border-radius:50%;background:var(--primary);color:var(--on-primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex:none}
+.drv .nm{font-weight:700}
+.drv .mt{font-size:12.5px;color:var(--muted)}
+.search{width:100%;min-height:46px;border:1px solid var(--hair);background:var(--surface);border-radius:12px;padding:10px 12px;font-size:16px;margin-bottom:10px}
+
+/* summary + paper */
+.sum{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px}
+.sum dt{color:var(--muted)} .sum dd{margin:0;font-weight:600}
+.paperwrap{margin-top:12px;border-radius:14px;border:1px solid var(--hair);background:#fff;max-height:62vh;overflow:auto}
+.paper{font-family:"Times New Roman",Times,serif;font-size:12.5px;line-height:1.38;color:#111;padding:18px 16px}
+.c-title{text-align:center;font-weight:700;font-size:15px}
+.c-sub{text-align:center;font-weight:700;margin-bottom:8px}
+.c-cd{display:flex;justify-content:space-between;margin-bottom:8px}
+.c-right{text-align:right;font-size:11px;margin-bottom:8px}
+.c-h{text-align:center;font-weight:700;margin:10px 0 4px}
+.c-p{margin:0 0 4px;text-align:justify}.c-p.ind{text-indent:1.5em}
+.c-li{margin:0 0 2px 1.5em}
+.c-tbl{border-collapse:collapse;width:100%;margin:4px 0}.c-tbl td{border:1px solid #333;padding:2px 6px;vertical-align:top}
+.c-sig{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:6px 0 10px}
+.c-pb{border:0;border-top:2px dashed #999;margin:16px 0}
+
+/* log */
+.log{display:flex;flex-direction:column;gap:9px;text-align:left;background:var(--surface);border:1px solid var(--hair);border-radius:16px;padding:13px}
+.log .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.log .nm{font-weight:700}
+.log .mt{font-size:13px;color:var(--muted)}
+.log .bt{display:flex;gap:8px;flex-wrap:wrap}
+.empty{text-align:center;color:var(--muted);padding:36px 16px}
+.empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
+
+/* overlay & toast */
+.overlay{position:fixed;inset:0;z-index:60;background:rgba(8,12,20,.6);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:24px}
+.ov{background:var(--surface);border-radius:20px;padding:22px;width:100%;max-width:380px;text-align:center;box-shadow:var(--shadow)}
+.ov b{display:block;font-size:16px;margin-bottom:12px}
+.bar{height:8px;border-radius:9px;background:var(--surface-2);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:9px;transition:width .3s}
+.bar.ind i{width:35%;animation:slide 1.1s ease-in-out infinite}
+@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}
+.ov .hint{margin-top:10px}
+.lockbox{display:flex;flex-direction:column;gap:10px;text-align:center}
+.lockbox b{margin:0;font-size:17px}
+.lockbox .hint{margin:0}
+.lockic{font-size:40px;line-height:1}
+.pwrow{display:flex;gap:8px}
+.pwrow input{flex:1;min-width:0;min-height:50px;border:1px solid var(--hair);background:var(--surface-2);border-radius:13px;padding:10px 14px;font-size:17px;color:var(--ink)}
+.pwrow input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.lockerr{color:var(--danger);font-size:14px;font-weight:600}
+.toast{position:fixed;left:50%;bottom:calc(var(--tabh) + 18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:70;background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:12px;font-size:14px;font-weight:600;max-width:calc(100% - 32px);box-shadow:var(--shadow)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div><div class="brand">Авто<i>Договор</i></div></div>
+    <span class="sub" id="topSub"></span>
+    <button class="iconbtn" data-act="tab" data-v="settings" aria-label="Настройки">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+    </button>
+  </header>
+  <main id="view"></main>
+</div>
+
+<nav class="tabbar"><div class="in" id="tabs">
+  <button class="tab" data-act="tab" data-v="new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/></svg>Договор</button>
+  <button class="tab" data-act="tab" data-v="log"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="4" width="14" height="16" rx="2"/><path d="M8.5 8.5h7M8.5 12h7M8.5 15.5h4"/></svg>Журнал</button>
+  <button class="tab" data-act="tab" data-v="drivers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg>Водители</button>
+  <button class="tab" data-act="tab" data-v="cars"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 13.5 5.2 7.5h13.6l2.2 6V18H3z"/><path d="M3 13.5h18M6.5 18v2M17.5 18v2"/><circle cx="7.5" cy="15.7" r="1"/><circle cx="16.5" cy="15.7" r="1"/></svg>Машины</button>
+</div></nav>
+
+<div class="overlay" id="ov" hidden><div class="ov"><b id="ovT">Распознаю…</b><div class="bar" id="ovBar"><i id="ovI"></i></div><div class="hint" id="ovH">Фото никуда не отправляются — всё распознаётся прямо в телефоне.</div></div></div>
+<div class="overlay" id="lock" hidden><div class="ov lockbox">
+  <div class="lockic">🔐</div>
+  <b id="lockT">Введи пароль от своих данных</b>
+  <p class="hint" id="lockH">Твои реквизиты и машины зашифрованы. Пароль нужен один раз на этом устройстве — дальше всё хранится в телефоне.</p>
+  <div class="pwrow"><input type="password" id="lockPw" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Пароль"><button class="btn sm" id="lockEye" type="button" aria-label="Показать пароль">👁</button></div>
+  <div class="pwrow" id="lockPw2Row" hidden><input type="password" id="lockPw2" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Повтори пароль"></div>
+  <div class="lockerr" id="lockErr" hidden></div>
+  <button class="btn pri wide" id="lockGo">Открыть</button>
+  <button class="btn ghost wide" id="lockSkip">Начать без данных</button>
+</div></div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="contract.js"></script>
+<script src="ocr.js"></script>
+<script>
+(function(){
+"use strict";
+/* ================= ДАННЫЕ ================= */
+var STORE="avtodogovor-v1";
+var EQUIP=["огнетушитель","знак аварийной остановки","аптечка","запасное колесо","домкрат и баллонный ключ","буксировочный трос","видеорегистратор","держатель для телефона","зарядное устройство для телефона"];
+// ВАЖНО: личные данные (паспорт, реквизиты, машины, СТС) в коде НЕ хранятся.
+// Они лежат в vault.json, зашифрованном паролем владельца (AES-256-GCM, ключ из пароля через PBKDF2).
+function defaults(){return {v:3,
+  settings:{
+    landlord:{fio:"",dob:"",passSeries:"",passNumber:"",passIssuedBy:"",passIssueDate:"",passCode:"",address:"",phone:"",phone2:"",email:""},
+    payment:{bank:"",phone:"",holder:""},
+    city:"Санкт-Петербург",region:"Санкт-Петербурга и Ленинградской области",transferPlace:"",notifyPhone:"",notifyEmail:"",
+    defTerm:60,defDeposit:5000,defPayEvery:1,minTerm:14,numbering:false,
+    penaltyTransfer:30000,penaltyScene:50000,penaltyCoop:10000,penaltyKey:15000,nextNumber:1,addrChecked:true},
+  cars:[],drivers:[],history:[],lastTerms:{}};}
+var db=null;
+try{db=JSON.parse(localStorage.getItem(STORE));}catch(e){}
+if(!db||!db.v)db=defaults();
+if(db.v<3){var D0=defaults().settings;for(var k0 in D0)if(db.settings[k0]===undefined)db.settings[k0]=D0[k0];db.v=3;}
+db.cars.forEach(function(c){if(!Array.isArray(c.items))c.items=[];if(!c.keys)c.keys=1;});
+var persistAsked=false;
+
+/* ===== Защищённая копия личных данных (vault.json) ===== */
+var Vault=(function(){
+  var ITER=600000,enc=new TextEncoder(),dec=new TextDecoder();
+  function b64(buf){var s="",b=new Uint8Array(buf);for(var i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);return btoa(s);}
+  function unb64(s){var r=atob(s),b=new Uint8Array(r.length);for(var i=0;i<r.length;i++)b[i]=r.charCodeAt(i);return b;}
+  async function key(pass,salt,iter){var base=await crypto.subtle.importKey("raw",enc.encode(pass),"PBKDF2",false,["deriveKey"]);
+    return crypto.subtle.deriveKey({name:"PBKDF2",salt:salt,iterations:iter,hash:"SHA-256"},base,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);}
+  async function seal(obj,pass){var salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+    var ct=await crypto.subtle.encrypt({name:"AES-GCM",iv:iv},await key(pass,salt,ITER),enc.encode(JSON.stringify(obj)));
+    return {kind:"avtodogovor-vault",v:1,kdf:"PBKDF2-SHA256",iter:ITER,salt:b64(salt),iv:b64(iv),data:b64(ct)};}
+  async function open(v,pass){var pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:unb64(v.iv)},await key(pass,unb64(v.salt),v.iter||ITER),unb64(v.data));return JSON.parse(dec.decode(pt));}
+  async function fetchVault(){try{var r=await fetch("vault.json",{cache:"no-store"});if(!r.ok)return null;var j=await r.json();return j&&j.kind==="avtodogovor-vault"?j:null;}catch(e){return null;}}
+  return {seal:seal,open:open,fetchVault:fetchVault};
+})();
+// Подставляет расшифрованные настройки и машины. Водителей и журнал не трогает.
+function applyPrivate(p){
+  var D0=defaults().settings,ps=p.settings||{};
+  db.settings=Object.assign({},D0,ps);
+  db.settings.landlord=Object.assign({},D0.landlord,ps.landlord||{});
+  db.settings.payment=Object.assign({},D0.payment,ps.payment||{});
+  db.cars=(p.cars||[]).map(function(c){return Object.assign({items:[],keys:1},c);});
+  db.v=3;save();
+}
+function privatePayload(){return {kind:"avtodogovor-private",v:1,settings:JSON.parse(JSON.stringify(db.settings)),cars:JSON.parse(JSON.stringify(db.cars))};}
+function save(){
+  try{localStorage.setItem(STORE,JSON.stringify(db));}catch(e){toast("Не удалось сохранить: память браузера переполнена");}
+  // просим браузер не удалять данные (важно для iPhone)
+  if(!persistAsked&&navigator.storage&&navigator.storage.persist){persistAsked=true;navigator.storage.persist().catch(function(){});}
+}
+
+var DFIELDS=["fio","dob","birthPlace","passSeries","passNumber","passIssuedBy","passIssueDate","passCode","address","licNumber","licIssuedBy","licIssueDate","phone","email","telegram"];
+var REQUIRED={fio:"ФИО",dob:"дата рождения",passSeries:"серия паспорта",passNumber:"номер паспорта",passIssuedBy:"кем выдан паспорт",passIssueDate:"дата выдачи паспорта",passCode:"код подразделения",address:"адрес регистрации",licNumber:"номер ВУ",licIssuedBy:"кем выдано ВУ",licIssueDate:"дата выдачи ВУ",phone:"телефон"};
+function emptyDriver(){var d={id:null,sex:""};DFIELDS.forEach(function(k){d[k]="";});return d;}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+function today(){var d=new Date();return d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate());}
+function now(){var d=new Date();return p2(d.getHours())+":"+p2(d.getMinutes());}
+function p2(n){return(n<10?"0":"")+n;}
+function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function car(id){return db.cars.filter(function(c){return c.id===id;})[0]||null;}
+function drv(id){return db.drivers.filter(function(d){return d.id===id;})[0]||null;}
+function rub(n){return n?String(n).replace(/\B(?=(\d{3})+(?!\d))/g," ")+" ₽":"—";}
+var isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+function addDays(iso,n){var p=/^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||"");if(!p)return null;var d=new Date(+p[1],+p[2]-1,+p[3]);d.setDate(d.getDate()+(+n||0));return d;}
+function fmtD(d){return p2(d.getDate())+"."+p2(d.getMonth()+1)+"."+d.getFullYear();}
+function daysFromToday(d){var t=new Date();t.setHours(0,0,0,0);return Math.round((d-t)/864e5);}
+// Принадлежности: scope "car" (по умолчанию для машины) или "terms" (для конкретного договора)
+function equipHtml(scope){
+  var o=scope==="car"?S.editCar:S.terms;var have=o.items||[];
+  var all=EQUIP.concat(have.filter(function(x){return EQUIP.indexOf(x)<0;}));
+  return '<p class="hint" style="margin:0 0 8px">Всегда передаются: СТС, полис ОСАГО и ключи. Отметь, что ещё кладёшь в машину — попадёт в п. 2.1 и в Акт.</p>'+
+    '<div class="chips">'+all.map(function(it){var on=have.indexOf(it)>=0;return '<button class="chip'+(on?" sel":"")+'" data-act="item_'+scope+'" data-v="'+esc(it)+'" aria-pressed="'+on+'">'+(on?"✓ ":"+ ")+esc(it)+"</button>";}).join("")+"</div>"+
+    '<div class="addrow"><input id="ci-'+scope+'" placeholder="Своё: например, «детское кресло»" autocomplete="off"><button class="btn sm" data-act="addItem_'+scope+'">Добавить</button></div>';
+}
+
+/* ================= СОСТОЯНИЕ ================= */
+var S={tab:"new",step:1,carId:null,driverId:null,draft:emptyDriver(),flags:{},photos:{passport:null,reg:null,lic:null},regLines:[],
+  terms:null,variant:"osago",warned:false,q:"",editCar:null,editDrv:null,lastDoc:null,lastEntryId:null,scanOpen:false};
+var installEvt=null;
+window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();installEvt=e;if(S.tab==="new"&&S.step===1)render();});
+var standalone=false;try{standalone=matchMedia("(display-mode: standalone)").matches||navigator.standalone;}catch(e){}
+
+/* ================= ВИДЖЕТЫ ================= */
+function plate(p){
+  var s=String(p||"").toUpperCase().replace(/\s+/g,"");
+  var m=/^([А-ЯA-Z])(\d{3})([А-ЯA-Z]{2})(\d{2,3})$/.exec(s);
+  if(!m)return '<span class="plate"><span class="m">'+esc(s||"— — —")+"</span></span>";
+  return '<span class="plate" aria-label="Госномер '+esc(s)+'"><span class="m"><small>'+m[1]+"</small>"+m[2]+"<small>"+m[3]+'</small></span><span class="r"><b>'+m[4]+'</b><span>RUS<i></i></span></span></span>';
+}
+function activeFor(carId){return db.history.filter(function(h){return h.carId===carId&&h.status==="active";})[0]||null;}
+function fld(m,k,label,o){
+  o=o||{};
+  var val=target(m)[k];
+  var st=m==="draft"&&S.flags[k]!==undefined?(S.flags[k]?"ok":"check"):"";
+  var badge=st==="ok"?'<span class="b ok">✓ сверено</span>':st==="check"?'<span class="b check">⚠ проверь</span>':"";
+  var attrs=' data-m="'+m+'" data-k="'+k+'" id="f-'+m+"-"+k+'"'+(o.mask?' data-mask="'+o.mask+'"':"")+(o.ph?' placeholder="'+esc(o.ph)+'"':"")+(o.im?' inputmode="'+o.im+'"':"")+(o.ac?' autocomplete="'+o.ac+'"':' autocomplete="off"');
+  var input=o.area?"<textarea"+attrs+' rows="2">'+esc(val)+"</textarea>":'<input type="'+(o.type||"text")+'"'+attrs+' value="'+esc(val)+'">';
+  return '<div class="f'+(o.full?" full":"")+(st?" "+st:"")+'" data-wrap="'+m+"-"+k+'"><label for="f-'+m+"-"+k+'">'+esc(label)+(o.opt?' <span class="hint">· необязательно</span>':"")+badge+"</label>"+input+(o.hint?'<span class="hint">'+esc(o.hint)+"</span>":"")+"</div>";
+}
+function target(m){
+  if(m==="draft")return S.draft; if(m==="terms")return S.terms; if(m==="car")return S.editCar; if(m==="ed")return S.editDrv;
+  if(m==="set")return db.settings; if(m==="land")return db.settings.landlord; if(m==="pay")return db.settings.payment; return {};
+}
+function driverForm(m){
+  return '<div class="grp">Личные данные</div><div class="fields">'+
+    fld(m,"fio","ФИО полностью",{full:true,ph:"Иванов Иван Иванович",ac:"name"})+
+    fld(m,"dob","Дата рождения",{mask:"date",ph:"дд.мм.гггг",im:"numeric"})+
+    fld(m,"birthPlace","Место рождения",{opt:true})+
+    '</div><div class="grp">Паспорт</div><div class="fields">'+
+    fld(m,"passSeries","Серия",{mask:"d4",ph:"4000",im:"numeric"})+
+    fld(m,"passNumber","Номер",{mask:"d6",ph:"123456",im:"numeric"})+
+    fld(m,"passIssuedBy","Кем выдан",{full:true,area:true})+
+    fld(m,"passIssueDate","Дата выдачи",{mask:"date",ph:"дд.мм.гггг",im:"numeric"})+
+    fld(m,"passCode","Код подразделения",{mask:"code",ph:"780-000",im:"numeric"})+
+    fld(m,"address","Адрес регистрации (прописка)",{full:true,area:true})+
+    '</div><div class="grp">Водительское удостоверение</div><div class="fields">'+
+    fld(m,"licNumber","Номер ВУ",{mask:"lic",ph:"99 00 000000",full:true})+
+    fld(m,"licIssuedBy","Кем выдано",{ph:"ГИБДД 7800"})+
+    fld(m,"licIssueDate","Дата выдачи",{mask:"date",ph:"дд.мм.гггг",im:"numeric"})+
+    '</div><div class="grp">Контакты</div><div class="fields">'+
+    fld(m,"phone","Телефон",{type:"tel",ph:"+7 900 000-00-00",im:"tel",full:true})+
+    fld(m,"email","E-mail",{type:"email",opt:true,im:"email"})+
+    fld(m,"telegram","Telegram",{opt:true,ph:"@ник"})+"</div>";
+}
+
+/* ================= ЭКРАН: НОВЫЙ ДОГОВОР ================= */
+var STEPS=["Машина","Арендатор","Условия","Договор"];
+function stepper(){
+  return '<div class="stepper">'+STEPS.map(function(n,i){var k=i+1;var cls=k===S.step?"on":k<S.step?"done":"";
+    return '<button class="st '+cls+'" data-act="goStep" data-v="'+k+'"'+(k>S.step?" disabled":"")+'><i></i>'+(k)+". "+n+"</button>";}).join("")+"</div>";
+}
+function viewNew(){
+  var h=stepper();
+  if(S.step===1){
+    h+='<h2 class="title">Какую машину сдаём?</h2><p class="lead">Данные авто подставятся в договор автоматически.</p>';
+    if(installEvt&&!standalone)h+='<div class="banner info"><b>Установи как приложение</b> — будет открываться с рабочего стола на весь экран. <button class="btn sm acc" data-act="install" style="margin-top:8px">Установить</button></div>';
+    if(isIOS&&!standalone&&!db.settings.iosHintHidden)h+='<div class="banner info"><b>На iPhone:</b> открой эту страницу в Safari → кнопка «Поделиться» (квадрат со стрелкой) → «На экран „Домой“». Приложение будет открываться на весь экран. <button class="btn sm" data-act="iosHide">Понятно</button></div>';
+    if(!db.cars.length)h+='<div class="empty"><b>Машин пока нет</b>Загрузи свои данные по паролю или добавь машину во вкладке «Машины».<div style="margin-top:12px"><button class="btn acc" data-act="unlockAgain">🔐 Загрузить мои данные</button></div></div>';
+    h+='<div class="cars">'+db.cars.map(function(c){
+      var a=activeFor(c.id);
+      return '<button class="car'+(S.carId===c.id?" sel":"")+'" data-act="pickCar" data-v="'+c.id+'">'+plate(c.plate)+
+        '<div><div class="nm">'+esc(c.label)+'</div><div class="mt">'+esc(c.model)+" · "+esc(c.year||"—")+" · "+esc(rub(c.rent))+" в сутки</div></div>"+
+        '<div class="row"><span class="dot" style="background:'+esc(c.hex||"#999")+'"></span><span class="mt">'+esc(c.color)+"</span>"+
+        (a?'<span class="pill busy">🔑 '+esc(Contract.initials(a.driverName)||"в аренде")+" · с "+esc(Contract.dmy(a.date))+"</span>":'<span class="pill free">свободна</span>')+
+        (c.note?'<span class="pill warn">⚠ проверь данные</span>':"")+"</div></button>";
+    }).join("")+"</div>";
+    h+='<div class="actions"><button class="btn pri" data-act="next"'+(S.carId?"":" disabled")+'>Далее — арендатор</button></div>';
+  }
+  if(S.step===2){
+    var c=car(S.carId);
+    h+='<h2 class="title">Арендатор</h2><p class="lead">'+plate(c.plate)+" &nbsp;"+esc(c.label)+"</p>";
+    if(db.drivers.length){
+      h+='<input class="search" type="search" placeholder="Найти водителя по фамилии…" data-act-input="q" value="'+esc(S.q)+'" id="drvSearch">';
+      h+='<div class="stack" id="drvList">'+drvListHtml(true)+"</div>";
+      h+='<div class="grp">Или новый водитель</div>';
+    }
+    h+='<div class="choices" style="grid-template-columns:1fr 1fr">'+
+      '<button class="choice'+(S.scanOpen?" sel":"")+'" data-act="scanToggle"><span class="ic">📷</span><span><b>По фото</b><span>Паспорт, прописка, ВУ</span></span></button>'+
+      '<button class="choice'+(!S.scanOpen&&!S.driverId?" sel":"")+'" data-act="manual"><span class="ic">✍️</span><span><b>Вручную</b><span>Ввести самому</span></span></button></div>';
+    if(S.scanOpen)h+=scanHtml();
+    if(S.driverId)h+='<div class="banner good">Выбран сохранённый водитель — проверь данные, при изменении они обновятся.</div>';
+    h+='<div id="dform">'+driverForm("draft")+"</div>";
+    var miss=missing(S.draft);
+    if(S.warned&&miss.length)h+='<div class="banner warn"><b>Не заполнено:</b> '+esc(miss.join(", "))+'. Эти места в договоре останутся пустыми строками — их можно вписать от руки. Нажми «Далее» ещё раз, чтобы продолжить.</div>';
+    h+='<div class="actions"><button class="btn ghost" data-act="back">Назад</button><button class="btn pri" data-act="next">Далее — условия</button></div>';
+  }
+  if(S.step===3){
+    var T=S.terms,c3=car(S.carId);
+    h+='<h2 class="title">Условия аренды</h2><p class="lead">'+plate(c3.plate)+" &nbsp;"+esc(Contract.fioNice(S.draft.fio)||"Арендатор не указан")+"</p>";
+    h+='<div class="grp">Вариант договора</div><div class="choices">'+
+      '<button class="choice'+(S.variant==="osago"?" sel":"")+'" data-act="variant" data-v="osago"><span class="ic">🛡️</span><span><b>С ОСАГО</b><span>Арендатор вносится в полис. Твой проверенный пункт 1.5 — без изменений.</span></span></button>'+
+      '<button class="choice'+(S.variant==="noosago"?" sel":"")+'" data-act="variant" data-v="noosago"><span class="ic">⚠️</span><span><b>Без ОСАГО</b><span>Арендатор НЕ вносится в полис, предупреждён и берёт всю ответственность за ДТП, ремонт потерпевших и регресс страховой.</span></span></button></div>';
+    h+='<div class="grp">Договор</div><div class="fields">'+
+      fld("terms","date","Дата",{type:"date"})+
+      fld("terms","time","Время передачи ТС",{type:"time",hint:"Попадёт в Акт — твоя защита"})+
+      fld("terms","term","Срок, дней",{im:"numeric",mask:"num",hint:"Минимум — "+(db.settings.minTerm||14)+" дн."})+
+      fld("terms","number","№ договора",{im:"numeric",ph:"без номера"})+
+      '</div><div class="grp">Деньги</div><div class="fields">'+
+      fld("terms","rent","Аренда, ₽ в сутки",{im:"numeric",mask:"num",ph:"1000"})+
+      fld("terms","payEvery","Оплата авансом за, суток",{im:"numeric",mask:"num"})+
+      fld("terms","deposit","Залог, ₽",{im:"numeric",mask:"num"})+
+      '<div class="f"><label>Стоимость авто</label><input value="'+esc(rub(c3.value))+'" disabled><span class="hint">Меняется в «Машинах»</span></div></div>'+
+      '<div class="grp">Что передаёшь с машиной</div><div class="fields" style="margin-bottom:10px">'+fld("terms","keys","Ключей, шт.",{im:"numeric",mask:"num"})+"</div>"+equipHtml("terms");
+    h+='<div class="actions"><button class="btn ghost" data-act="back">Назад</button><button class="btn pri" data-act="make">Сформировать договор</button></div>';
+  }
+  if(S.step===4){
+    var e=db.history.filter(function(x){return x.id===S.lastEntryId;})[0];
+    if(!e){S.step=1;return viewNew();}
+    var c4=e.data.car;
+    h+='<h2 class="title">Договор готов ✓</h2><p class="lead">Сохранён в журнал. Скачай .docx или отправь водителю.</p>';
+    h+='<div class="card"><dl class="sum"><dt>№</dt><dd>'+esc(e.number||"—")+" от "+esc(Contract.dmy(e.date))+'</dd><dt>Машина</dt><dd>'+plate(c4.plate)+'</dd><dt>Арендатор</dt><dd>'+esc(Contract.fioNice(e.driverName)||"— (бланк)")+'</dd><dt>Вариант</dt><dd>'+(e.variant==="noosago"?'<span class="pill no">Без ОСАГО</span>':'<span class="pill free">С ОСАГО</span>')+'</dd><dt>Аренда</dt><dd>'+esc(rub(e.data.terms.rent))+" / сутки, срок "+esc(e.data.terms.term||"—")+" дн.</dd></dl></div>";
+    h+='<div class="actions" style="position:static"><button class="btn acc" data-act="dl" data-v="'+e.id+'">'+(isIOS?"⬇ Сохранить или отправить":"⬇ Скачать .docx")+"</button>"+(!isIOS&&canShare()?'<button class="btn" data-act="share" data-v="'+e.id+'">Отправить</button>':"")+"</div>";
+    h+='<div class="grp">Предпросмотр</div><div class="paperwrap"><div class="paper">'+Contract.toHTML(Contract.build(e.data))+"</div></div>";
+    h+='<div class="actions"><button class="btn ghost" data-act="goStep" data-v="3">Изменить</button><button class="btn pri" data-act="reset">Новый договор</button></div>';
+  }
+  return h;
+}
+function drvListHtml(selectable){
+  var q=S.q.trim().toLowerCase();
+  var list=db.drivers.filter(function(d){return !q||String(d.fio).toLowerCase().indexOf(q)>=0;}).slice().sort(function(a,b){return (b.updated||0)-(a.updated||0);});
+  if(!list.length)return '<div class="empty" style="padding:14px">Никого не найдено</div>';
+  return list.map(function(d){
+    var ini=String(d.fio||"?").trim().split(/\s+/).map(function(x){return x[0];}).slice(0,2).join("").toUpperCase();
+    return '<button class="drv'+(selectable&&S.driverId===d.id?" sel":"")+'" data-act="'+(selectable?"pickDrv":"editDrv")+'" data-v="'+d.id+'"><span class="ava">'+esc(ini)+'</span><span><span class="nm">'+esc(Contract.fioNice(d.fio))+'</span><br><span class="mt">паспорт '+esc(d.passSeries)+" "+esc(d.passNumber)+(d.phone?" · "+esc(d.phone):"")+"</span></span></button>";
+  }).join("");
+}
+function scanHtml(){
+  var SL=[["passport","Паспорт — разворот с фото","Целиком, вместе с двумя строками «<<<» внизу"],["reg","Прописка","Страница со штампом регистрации"],["lic","Водительское — лицевая сторона","Оборот не нужен: в договор идут номер, дата и кем выдано"]];
+  var h='<div class="card" style="margin-top:10px"><div class="slots">'+SL.map(function(s){
+    var ph=S.photos[s[0]];
+    return '<div class="slot'+(ph?" has":"")+'"><div class="thumb">'+(ph?'<img src="'+ph.url+'" style="transform:rotate('+ph.rot+'deg)" alt="">':"🪪")+'</div><div><b>'+s[1]+'</b><span class="hint">'+s[2]+'</span><div class="bt">'+
+      (ph?'<button class="btn sm" data-act="rot" data-v="'+s[0]+'">↻ Повернуть</button><button class="btn sm" data-act="unphoto" data-v="'+s[0]+'">Убрать</button>':
+      '<label class="btn sm filebtn">📷 Снять<input type="file" accept="image/*" capture="environment" data-photo="'+s[0]+'"></label><label class="btn sm filebtn">Из галереи<input type="file" accept="image/*" data-photo="'+s[0]+'"></label>')+
+      "</div></div></div>";
+  }).join("")+"</div>";
+  var any=S.photos.passport||S.photos.reg||S.photos.lic;
+  h+='<button class="btn acc wide" style="margin-top:12px" data-act="scan"'+(any?"":" disabled")+'>Распознать</button>';
+  h+='<p class="hint" style="margin:8px 2px 0">Распознавание идёт прямо в телефоне — фото никуда не отправляются и не сохраняются. Первый запуск скачает словарь (~15 МБ), дальше работает офлайн. Поля с «✓ сверено» проверены по контрольным цифрам паспорта, с «⚠ проверь» — сверь глазами.</p>';
+  if(S.regLines.length)h+='<div class="grp">Строки с прописки — нажми, чтобы добавить в адрес</div><div class="chips">'+S.regLines.map(function(l,i){return '<button class="chip" data-act="addAddr" data-v="'+i+'">+ '+esc(l)+"</button>";}).join("")+'</div><button class="btn sm ghost" data-act="clrAddr" style="margin-top:6px">Очистить адрес</button>';
+  return h+"</div>";
+}
+function missing(d){var m=[];for(var k in REQUIRED)if(!String(d[k]||"").trim())m.push(REQUIRED[k]);return m;}
+
+/* ================= ЖУРНАЛ ================= */
+function viewLog(){
+  var h='<h2 class="title">Журнал договоров</h2><p class="lead">Кто, на какой машине и с какого числа. Можно скачать заново.</p>';
+  if(!db.history.length)return h+'<div class="empty"><b>Пока пусто</b>Сформированные договоры появятся здесь.</div>';
+  var list=db.history.slice().sort(function(a,b){return b.createdAt-a.createdAt;});
+  return h+'<div class="stack">'+list.map(function(e){
+    var info="";
+    if(e.status==="active"){
+      var end=addDays(e.date,e.data.terms.term),minEnd=addDays(e.date,(e.data.settings&&e.data.settings.minTerm)||14);
+      if(end){var left=daysFromToday(end);info+=left>=0?'<span class="pill">до '+fmtD(end)+" · осталось "+left+" дн.</span>":'<span class="pill no">срок истёк '+(-left)+" дн. назад</span>";}
+      if(minEnd&&daysFromToday(minEnd)>0)info+='<span class="pill warn">мин. срок до '+fmtD(minEnd)+"</span>";
+    }
+    return '<div class="log"><div class="top">'+plate(e.data.car.plate)+(e.status==="active"?'<span class="pill busy">машина у арендатора</span>':'<span class="pill">возвращена</span>')+(e.variant==="noosago"?'<span class="pill no">без ОСАГО</span>':"")+info+'</div>'+
+      '<div><div class="nm">'+esc(Contract.fioNice(e.driverName)||"Бланк без арендатора")+'</div><div class="mt">№ '+esc(e.number||"—")+" от "+esc(Contract.dmy(e.date))+" · "+esc(e.data.car.label||e.data.car.model)+"</div></div>"+
+      '<div class="bt"><button class="btn sm acc" data-act="dl" data-v="'+e.id+'">⬇ .docx</button>'+(canShare()?'<button class="btn sm" data-act="share" data-v="'+e.id+'">Отправить</button>':"")+
+      '<button class="btn sm" data-act="toggleRet" data-v="'+e.id+'">'+(e.status==="active"?"Машину вернули":"Снова активен")+'</button><button class="btn sm danger" data-act="delLog" data-v="'+e.id+'">Удалить</button></div></div>';
+  }).join("")+"</div>";
+}
+
+/* ================= ВОДИТЕЛИ ================= */
+function viewDrivers(){
+  if(S.editDrv){
+    var isNew=!drv(S.editDrv.id);
+    return '<h2 class="title">'+(isNew?"Новый водитель":"Карточка водителя")+"</h2>"+driverForm("ed")+
+      '<div class="actions"><button class="btn ghost" data-act="cancelDrv">Назад</button>'+(isNew?"":'<button class="btn danger" data-act="delDrv">Удалить</button>')+'<button class="btn pri" data-act="saveDrv">Сохранить</button></div>'+
+      (isNew?"":'<button class="btn wide" style="margin-top:4px" data-act="contractWith">Новый договор с этим водителем</button>');
+  }
+  var h='<h2 class="title">Водители</h2><p class="lead">Сохраняются автоматически при оформлении договора. Хранятся только на этом устройстве.</p>';
+  h+='<button class="btn wide" data-act="newDrv" style="margin-bottom:12px">+ Добавить водителя</button>';
+  if(!db.drivers.length)return h+'<div class="empty"><b>Водителей пока нет</b>Добавь вручную или оформи первый договор.</div>';
+  return h+'<input class="search" type="search" placeholder="Поиск по фамилии…" data-act-input="q" value="'+esc(S.q)+'" id="drvSearch"><div class="stack" id="drvList">'+drvListHtml(false)+"</div>";
+}
+
+/* ================= МАШИНЫ ================= */
+var CFIELDS=[["label","Название в приложении",{full:true,ph:"Калина серебристая"}],["model","Марка, модель (как в СТС)",{full:true}],["plate","Госномер",{ph:"А123ВС147"}],["year","Год выпуска",{im:"numeric"}],
+ ["vin","VIN",{full:true}],["engine","Модель и № двигателя",{}],["body","№ кузова",{}],["chassis","№ шасси (рамы)",{}],["category","Категория",{}],["type","Тип ТС (как в СТС)",{full:true}],["color","Цвет (как в СТС)",{}],["hex","Цвет для иконки",{type:"color"}],
+ ["docs","Документ о праве (СТС: серия, №, дата)",{full:true,area:true}],["value","Стоимость авто, ₽",{im:"numeric",mask:"num",hint:"Для п. 1.3 — сумма возмещения при угоне/гибели"}],
+ ["rent","Аренда по умолчанию, ₽ в сутки",{im:"numeric",mask:"num"}],["keys","Ключей передаётся, шт.",{im:"numeric",mask:"num"}]];
+function viewCars(){
+  if(S.editCar){
+    var isNew=!car(S.editCar.id);
+    return '<h2 class="title">'+(isNew?"Новая машина":esc(S.editCar.label))+"</h2>"+(S.editCar.note?'<div class="banner warn"><b>Проверь:</b> '+esc(S.editCar.note)+' <button class="btn sm" data-act="clrNote" style="margin-top:8px">Проверил, всё верно</button></div>':"")+
+      '<div class="fields">'+CFIELDS.map(function(f){return fld("car",f[0],f[1],f[2]);}).join("")+"</div>"+
+      '<div class="grp">Обычно лежит в машине</div>'+equipHtml("car")+
+      '<div class="actions"><button class="btn ghost" data-act="cancelCar">Назад</button>'+(isNew?"":'<button class="btn danger" data-act="delCar">Удалить</button>')+'<button class="btn pri" data-act="saveCar">Сохранить</button></div>';
+  }
+  var h='<h2 class="title">Машины</h2><p class="lead">Данные из твоих договоров. Нажми на машину, чтобы поправить.</p><button class="btn wide" data-act="newCar" style="margin-bottom:12px">+ Добавить машину</button><div class="cars">';
+  return h+db.cars.map(function(c){
+    return '<button class="car" data-act="editCar" data-v="'+c.id+'">'+plate(c.plate)+'<div><div class="nm">'+esc(c.label)+'</div><div class="mt">'+esc(c.model)+" · "+esc(c.year||"—")+" · "+esc(rub(c.rent))+" в сутки<br>VIN "+esc(c.vin||"—")+"</div></div>"+
+      '<div class="row"><span class="dot" style="background:'+esc(c.hex||"#999")+'"></span><span class="mt">'+esc(c.color)+"</span>"+(c.note?'<span class="pill warn">⚠ проверь данные</span>':"")+(c.engine?"":'<span class="pill no">нет № двигателя</span>')+"</div></button>";
+  }).join("")+"</div>";
+}
+
+/* ================= НАСТРОЙКИ ================= */
+function viewSettings(){
+  var L="land",P="pay";
+  return '<h2 class="title">Настройки</h2><p class="lead">Твои данные как Арендодателя — подставляются в каждый договор.</p>'+
+    (db.settings.addrChecked?"":'<div class="banner warn"><b>Сверь адрес регистрации с паспортом</b> — в старых договорах их было два разных. <button class="btn sm" data-act="addrOk" style="margin-top:8px">Адрес верный</button></div>')+
+    '<div class="grp">Арендодатель</div><div class="fields">'+
+    fld(L,"fio","ФИО",{full:true})+fld(L,"dob","Дата рождения",{mask:"date",im:"numeric"})+fld(L,"passCode","Код подразделения",{mask:"code",im:"numeric"})+
+    fld(L,"passSeries","Серия паспорта",{mask:"d4",im:"numeric"})+fld(L,"passNumber","Номер",{mask:"d6",im:"numeric"})+
+    fld(L,"passIssuedBy","Кем выдан",{full:true,area:true})+fld(L,"passIssueDate","Дата выдачи",{mask:"date",im:"numeric"})+
+    fld(L,"phone","Телефон",{type:"tel"})+fld(L,"phone2","Второй телефон",{type:"tel",opt:true})+
+    fld(L,"address","Адрес регистрации",{full:true,area:true})+fld(L,"email","E-mail",{full:true,type:"email"})+
+    '</div><div class="grp">Куда платить аренду (п. 3.3)</div><div class="fields">'+
+    fld(P,"bank","Банк",{})+fld(P,"phone","Телефон для перевода",{type:"tel"})+
+    fld(P,"holder","Получатель — в родительном падеже",{full:true,hint:"«на имя …», например: Ивановой Марии Петровны"})+
+    '</div><div class="grp">Расторжение (п. 11.1) — куда арендатор пишет за 7 дней</div><div class="fields">'+
+    fld("set","notifyPhone","Телефон (SMS, Telegram, WhatsApp)",{type:"tel"})+fld("set","notifyEmail","E-mail",{type:"email"})+
+    '</div><div class="grp">Условия по умолчанию</div><div class="fields">'+
+    fld("set","defTerm","Срок договора, дней",{im:"numeric",mask:"num"})+fld("set","minTerm","Минимальный срок, дней",{im:"numeric",mask:"num",hint:"Раньше — залог не возвращается (п. 4.5)"})+
+    fld("set","defDeposit","Залог, ₽",{im:"numeric",mask:"num"})+fld("set","defPayEvery","Оплата авансом за, суток",{im:"numeric",mask:"num"})+
+    fld("set","transferPlace","Место передачи машины (в Акт)",{full:true,area:true})+
+    fld("set","city","Город договора",{})+
+    fld("set","region","Где можно ездить (п. 8.3), в род. падеже",{full:true})+
+    '<label class="tgl"><input type="checkbox" data-m="set" data-k="numbering"'+(db.settings.numbering?" checked":"")+'><div>Нумеровать договоры<span>Если включено, № ставится автоматически по порядку</span></div></label>'+
+    (db.settings.numbering?fld("set","nextNumber","Следующий №",{im:"numeric",mask:"num"}):"")+
+    '</div><div class="grp">Штрафы</div><div class="fields">'+
+    fld("set","penaltyKey","За утерю ключа, ₽",{im:"numeric",mask:"num"})+
+    fld("set","penaltyTransfer","Передача третьим лицам, ₽",{im:"numeric",mask:"num"})+
+    fld("set","penaltyScene","Оставление места ДТП, ₽",{im:"numeric",mask:"num"})+
+    fld("set","penaltyCoop","Отказ подтвердить управление (камеры), ₽",{im:"numeric",mask:"num"})+
+    '</div><p class="hint" style="margin-top:8px">Изменения сохраняются сразу.</p>'+
+    '<div class="grp">Данные и безопасность</div><div class="card stack">'+
+    '<p class="hint" style="margin:0">Все данные (водители, паспорта, журнал) хранятся только в этом браузере на этом устройстве и никуда не отправляются. Ты — оператор персональных данных (152-ФЗ): согласие водителя на обработку уже есть в п. 10.1 договора. Регулярно делай резервную копию — если очистить данные браузера, всё пропадёт.</p>'+
+    '<button class="btn" data-act="unlockAgain">🔐 Загрузить мои данные по паролю</button>'+
+    '<button class="btn" data-act="makeVault">🔐 Создать защищённую копию (vault.json)</button>'+
+    '<p class="hint" style="margin:0">Защищённую копию делай после изменений в машинах или реквизитах и выкладывай файл vault.json на сайт вместо старого — тогда на новом устройстве всё подтянется по паролю.</p>'+
+    '<button class="btn" data-act="backup">⬇ Скачать полную резервную копию</button>'+
+    '<label class="btn filebtn">⬆ Восстановить из копии<input type="file" accept="application/json,.json" id="restoreInp"></label>'+
+    (installEvt&&!standalone?'<button class="btn acc" data-act="install">Установить как приложение</button>':"")+
+    '<button class="btn danger" data-act="wipeDrivers">Удалить всех водителей</button>'+
+    '<button class="btn danger" data-act="wipeAll">Сбросить всё к заводским</button></div>';
+}
+
+/* ================= РЕНДЕР ================= */
+var TITLES={new:"",log:"",drivers:"",cars:"",settings:""};
+function render(){
+  var v=document.getElementById("view");
+  v.innerHTML=S.tab==="new"?viewNew():S.tab==="log"?viewLog():S.tab==="drivers"?viewDrivers():S.tab==="cars"?viewCars():viewSettings();
+  [].forEach.call(document.querySelectorAll(".tab"),function(t){t.classList.toggle("on",t.getAttribute("data-v")===S.tab);});
+  document.getElementById("topSub").textContent=TITLES[S.tab]||"";
+}
+function go(){render();window.scrollTo(0,0);}
+
+/* ================= ДОГОВОР ================= */
+function buildData(){
+  var st=db.settings;
+  var d={}; DFIELDS.forEach(function(k){d[k]=String(S.draft[k]||"").trim();}); d.sex=S.draft.sex||"";
+  return {landlord:JSON.parse(JSON.stringify(st.landlord)),payment:JSON.parse(JSON.stringify(st.payment)),
+    settings:{city:st.city,region:st.region,transferPlace:st.transferPlace,notifyPhone:st.notifyPhone,notifyEmail:st.notifyEmail,minTerm:+st.minTerm||14,
+      penaltyTransfer:+st.penaltyTransfer||30000,penaltyScene:+st.penaltyScene||50000,penaltyCoop:+st.penaltyCoop||10000,penaltyKey:+st.penaltyKey||15000},
+    car:JSON.parse(JSON.stringify(car(S.carId))),driver:d,terms:JSON.parse(JSON.stringify(S.terms)),variant:S.variant};
+}
+function fileName(e){
+  var dn=Contract.initials(e.driverName).replace(/[.\s]+/g,"")||"бланк";
+  var n="Договор_"+(e.data.car.plate||"")+"_"+dn+"_"+Contract.dmy(e.date)+(e.variant==="noosago"?"_без_ОСАГО":"")+".docx";
+  return n.replace(/[\\\/:*?"<>|]/g,"").replace(/\s+/g,"_");
+}
+function entry(id){return db.history.filter(function(x){return x.id===id;})[0];}
+function docBlob(e){return Contract.toDocx(JSZip,Contract.build(e.data),"Договор аренды "+(e.data.car.plate||""),"blob");}
+function canShare(){try{return !!(navigator.canShare&&navigator.canShare({files:[new File(["x"],"t.docx",{type:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"})]}));}catch(e){return false;}}
+function download(id){
+  if(isIOS&&canShare()){share(id);return;} // на iPhone надёжнее системное меню «Сохранить в Файлы / отправить»
+  var e=entry(id);if(!e)return;
+  docBlob(e).then(function(b){var u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=fileName(e);document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u);},4000);toast("Скачан: "+fileName(e));})
+   .catch(function(err){toast("Ошибка создания файла: "+err.message);});
+}
+function share(id){
+  var e=entry(id);if(!e)return;
+  docBlob(e).then(function(b){var f=new File([b],fileName(e),{type:b.type});return navigator.share({files:[f],title:"Договор аренды"});})
+   .catch(function(err){if(err&&err.name!=="AbortError")toast("Не удалось отправить: "+err.message);});
+}
+
+/* ================= ДЕЙСТВИЯ ================= */
+function startTerms(){
+  var last=db.lastTerms[S.carId]||{};
+  var c=car(S.carId)||{},st=db.settings;
+  S.terms={number:st.numbering?String(st.nextNumber||1):"",date:today(),time:now(),
+    rent:String(last.rent||c.rent||""),payEvery:String(last.payEvery||st.defPayEvery||1),term:String(last.term||st.defTerm||60),deposit:String(last.deposit||st.defDeposit||5000),
+    keys:String(c.keys||1),items:(c.items||[]).slice()};
+}
+function saveDraftDriver(){
+  if(!String(S.draft.fio||"").trim())return;
+  var d=S.draft, ex=d.id?drv(d.id):null;
+  if(!ex)ex=db.drivers.filter(function(x){return d.passNumber&&x.passNumber===d.passNumber&&x.passSeries===d.passSeries;})[0]||null;
+  var rec=ex||{id:uid()};
+  DFIELDS.forEach(function(k){rec[k]=String(d[k]||"").trim();});rec.sex=d.sex||rec.sex||"";rec.updated=Date.now();
+  if(!ex)db.drivers.push(rec);
+  S.draft.id=rec.id;S.driverId=rec.id;save();
+}
+function toggleItem(o,v){if(!o)return;o.items=o.items||[];var i=o.items.indexOf(v);if(i>=0)o.items.splice(i,1);else o.items.push(v);}
+function addItem(o,scope){
+  var el=document.getElementById("ci-"+scope);if(!el||!o)return;
+  var v=String(el.value||"").trim().replace(/[;.]+$/,"").toLowerCase();if(!v){el.focus();return;}
+  o.items=o.items||[];if(o.items.indexOf(v)<0)o.items.push(v);render();toast("Добавлено: "+v);
+}
+var A={
+  tab:function(v){S.tab=v;S.editCar=null;S.editDrv=null;S.q="";go();},
+  goStep:function(v){v=+v;if(v<S.step||v===3&&S.step===4){S.step=v;go();}},
+  pickCar:function(v){S.carId=v;render();},
+  next:function(){
+    if(S.step===1&&S.carId){S.step=2;go();return;}
+    if(S.step===2){var miss=missing(S.draft);if(miss.length&&!S.warned){S.warned=true;render();var b=document.querySelector(".banner.warn");if(b)b.scrollIntoView({block:"center"});return;}
+      saveDraftDriver();S.warned=false;startTerms();S.step=3;go();}
+  },
+  back:function(){S.step=Math.max(1,S.step-1);S.warned=false;go();},
+  variant:function(v){S.variant=v;render();},
+  pickDrv:function(v){var d=drv(v);if(!d)return;S.driverId=v;S.draft=Object.assign(emptyDriver(),d);S.flags={};S.scanOpen=false;S.warned=false;render();var f=document.getElementById("dform");if(f)f.scrollIntoView({behavior:"smooth"});},
+  manual:function(){S.scanOpen=false;S.driverId=null;S.draft=emptyDriver();S.flags={};S.regLines=[];S.warned=false;render();var f=document.getElementById("f-draft-fio");if(f)f.focus();},
+  scanToggle:function(){S.scanOpen=!S.scanOpen;if(S.scanOpen&&S.driverId){S.driverId=null;S.draft=emptyDriver();S.flags={};}render();},
+  rot:function(v){S.photos[v].rot=(S.photos[v].rot+90)%360;render();},
+  unphoto:function(v){if(S.photos[v])URL.revokeObjectURL(S.photos[v].url);S.photos[v]=null;render();},
+  scan:runScan,
+  addAddr:function(v){var l=S.regLines[+v];if(!l)return;S.draft.address=(S.draft.address?S.draft.address+", ":"")+l;S.flags.address=false;render();},
+  clrAddr:function(){S.draft.address="";delete S.flags.address;render();},
+  make:function(){
+    var T=S.terms;db.lastTerms[S.carId]={rent:T.rent,payEvery:T.payEvery,term:T.term,deposit:T.deposit};
+    var data=buildData(),e={id:uid(),createdAt:Date.now(),number:T.number,date:T.date,time:T.time,variant:S.variant,carId:S.carId,driverId:S.driverId,driverName:data.driver.fio,status:"active",data:data};
+    db.history.push(e);
+    var n=parseInt(T.number,10);if(!isNaN(n)&&n>=(+db.settings.nextNumber||1))db.settings.nextNumber=n+1;
+    save();S.lastEntryId=e.id;S.step=4;go();
+  },
+  dl:download, share:share,
+  reset:function(){S.step=1;S.carId=null;S.driverId=null;S.draft=emptyDriver();S.flags={};S.regLines=[];S.scanOpen=false;S.warned=false;
+    ["passport","reg","lic"].forEach(function(k){if(S.photos[k])URL.revokeObjectURL(S.photos[k].url);S.photos[k]=null;});go();},
+  toggleRet:function(v){var e=entry(v);if(!e)return;e.status=e.status==="active"?"closed":"active";save();render();toast(e.status==="active"?"Договор снова активен":"Отмечено: машину вернули");},
+  delLog:function(v){if(!confirm("Удалить договор из журнала?"))return;db.history=db.history.filter(function(x){return x.id!==v;});save();render();},
+  newDrv:function(){S.editDrv=emptyDriver();S.editDrv.id=uid();render();window.scrollTo(0,0);},
+  editDrv:function(v){S.editDrv=Object.assign(emptyDriver(),drv(v));go();},
+  cancelDrv:function(){S.editDrv=null;go();},
+  saveDrv:function(){var d=S.editDrv;if(!String(d.fio||"").trim()){toast("Укажи ФИО");return;}var ex=drv(d.id);d.updated=Date.now();if(ex)Object.assign(ex,d);else db.drivers.push(Object.assign({},d));save();S.editDrv=null;go();toast("Сохранено");},
+  delDrv:function(){if(!confirm("Удалить водителя? Его договоры в журнале останутся."))return;var id=S.editDrv.id;db.drivers=db.drivers.filter(function(x){return x.id!==id;});save();S.editDrv=null;go();},
+  contractWith:function(){var d=S.editDrv;S.editDrv=null;S.tab="new";S.step=1;S.driverId=d.id;S.draft=Object.assign(emptyDriver(),drv(d.id));S.flags={};go();toast("Выбери машину — водитель уже подставлен");},
+  newCar:function(){S.editCar={id:uid(),label:"",model:"",category:"B",type:"",plate:"",vin:"",year:"",engine:"",chassis:"отсутствует",body:"",color:"",hex:"#888888",docs:"",value:400000,note:""};go();},
+  editCar:function(v){S.editCar=Object.assign({},car(v));go();},
+  cancelCar:function(){S.editCar=null;go();},
+  clrNote:function(){S.editCar.note="";render();},
+  saveCar:function(){var c=S.editCar;if(!c.plate&&!c.label){toast("Укажи хотя бы название или госномер");return;}c.plate=String(c.plate||"").toUpperCase().replace(/\s+/g,"");if(!c.label)c.label=c.model||c.plate;
+    var ex=car(c.id);if(ex)Object.assign(ex,c);else db.cars.push(Object.assign({},c));save();S.editCar=null;go();toast("Машина сохранена");},
+  delCar:function(){if(!confirm("Удалить машину из списка?"))return;var id=S.editCar.id;db.cars=db.cars.filter(function(x){return x.id!==id;});if(S.carId===id)S.carId=null;save();S.editCar=null;go();},
+  addrOk:function(){db.settings.addrChecked=true;save();render();toast("Отлично");},
+  iosHide:function(){db.settings.iosHintHidden=true;save();render();},
+  item_car:function(v){toggleItem(S.editCar,v);render();},
+  item_terms:function(v){toggleItem(S.terms,v);render();},
+  addItem_car:function(){addItem(S.editCar,"car");},
+  addItem_terms:function(){addItem(S.terms,"terms");},
+  backup:function(){var b=new Blob([JSON.stringify(db,null,1)],{type:"application/json"}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download="АвтоДоговор_копия_"+Contract.dmy(today())+".json";document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u);},3000);},
+  wipeDrivers:function(){if(!confirm("Удалить ВСЕХ водителей с этого устройства? Журнал договоров сохранится."))return;db.drivers=[];save();render();toast("Водители удалены");},
+  wipeAll:function(){if(!confirm("Сбросить ВСЁ: машины, водителей, журнал и настройки? Это нельзя отменить."))return;db=defaults();save();S.tab="new";S.step=1;S.carId=null;go();},
+  install:function(){if(!installEvt)return;installEvt.prompt();installEvt.userChoice.finally(function(){installEvt=null;render();});}
+};
+
+/* ================= СКАН ================= */
+var ovEl=document.getElementById("ov"),ovT=document.getElementById("ovT"),ovI=document.getElementById("ovI"),ovBar=document.getElementById("ovBar");
+function runScan(){
+  ovEl.hidden=false;ovT.textContent="Подготовка…";
+  OCR.scan(S.photos,function(label,p){ovT.textContent=label;if(p==null){ovBar.classList.add("ind");}else{ovBar.classList.remove("ind");ovI.style.width=Math.round(p*100)+"%";}})
+  .then(function(r){
+    ovEl.hidden=true;var n=0;
+    for(var k in r.fields){if(k==="sex"){S.draft.sex=r.fields.sex;continue;}
+      var cur=String(S.draft[k]||"").trim();
+      if(!cur||S.flags[k]!==undefined){S.draft[k]=r.fields[k];S.flags[k]=!!r.ok[k];n++;}}
+    S.regLines=r.regLines||[];render();
+    var msg=n?("Заполнено полей: "+n+". Проверь отмеченные ⚠"):"Не удалось ничего прочитать — попробуй сфотографировать ровнее и при хорошем свете";
+    if(r.notes.length)msg+=". "+r.notes[0];toast(msg,6000);
+    var f=document.getElementById("dform");if(f&&n)f.scrollIntoView({behavior:"smooth"});
+  }).catch(function(err){ovEl.hidden=true;toast("Ошибка распознавания: "+(err&&err.message||err),6000);});
+}
+
+/* ================= СОБЫТИЯ ================= */
+document.addEventListener("click",function(e){
+  var t=e.target.closest("[data-act]");if(!t||t.disabled)return;
+  var f=A[t.getAttribute("data-act")];if(f){e.preventDefault();f(t.getAttribute("data-v"));}
+});
+var MASK={
+  date:function(v){var d=v.replace(/\D/g,"").slice(0,8),o=d.slice(0,2);if(d.length>2)o+="."+d.slice(2,4);if(d.length>4)o+="."+d.slice(4);return o;},
+  code:function(v){var d=v.replace(/\D/g,"").slice(0,6);return d.length>3?d.slice(0,3)+"-"+d.slice(3):d;},
+  d4:function(v){return v.replace(/\D/g,"").slice(0,4);}, d6:function(v){return v.replace(/\D/g,"").slice(0,6);},
+  num:function(v){return v.replace(/\D/g,"").slice(0,9);},
+  lic:function(v){var d=v.toUpperCase().replace(/[^0-9А-ЯЁA-Z]/g,"").slice(0,10);return [d.slice(0,2),d.slice(2,4),d.slice(4)].filter(Boolean).join(" ");}
+};
+document.addEventListener("input",function(e){
+  var el=e.target;
+  if(el.getAttribute("data-act-input")==="q"){S.q=el.value;var l=document.getElementById("drvList");if(l)l.innerHTML=drvListHtml(S.tab==="new");return;}
+  if(el.type==="checkbox")return; // галочки обрабатываются в change
+  var m=el.getAttribute("data-m"),k=el.getAttribute("data-k");if(!m||!k)return;
+  var mk=el.getAttribute("data-mask");
+  if(mk&&MASK[mk]){var nv=MASK[mk](el.value);if(nv!==el.value)el.value=nv;}
+  target(m)[k]=el.value;
+  if(m==="draft"&&S.flags[k]!==undefined){delete S.flags[k];var w=document.querySelector('[data-wrap="draft-'+k+'"]');if(w){w.classList.remove("ok","check");var bd=w.querySelector(".b");if(bd)bd.remove();}}
+  if(m==="land"||m==="pay"||m==="set")save();
+  if(m==="draft")S.warned=false;
+});
+document.addEventListener("change",function(e){
+  var el=e.target;
+  if(el.matches("input[data-photo]")&&el.files&&el.files[0]){var k=el.getAttribute("data-photo");if(S.photos[k])URL.revokeObjectURL(S.photos[k].url);
+    S.photos[k]={file:el.files[0],url:URL.createObjectURL(el.files[0]),rot:0};render();}
+  if(el.type==="checkbox"&&el.getAttribute("data-m")){target(el.getAttribute("data-m"))[el.getAttribute("data-k")]=el.checked;save();render();return;}
+  if(el.id==="restoreInp"&&el.files&&el.files[0]){var rd=new FileReader();rd.onload=function(){try{var o=JSON.parse(rd.result);if(!o||!o.v||!o.cars)throw new Error("не похоже на копию АвтоДоговора");
+      if(!confirm("Заменить текущие данные данными из копии?"))return;db=o;save();go();toast("Данные восстановлены");}catch(err){toast("Ошибка: "+err.message);}};rd.readAsText(el.files[0]);}
+});
+document.addEventListener("keydown",function(e){
+  if(e.key==="Enter"&&e.target.id&&e.target.id.indexOf("ci-")===0){e.preventDefault();var sc=e.target.id.slice(3);addItem(sc==="car"?S.editCar:S.terms,sc);}
+});
+var tT=0;function toast(msg,ms){var t=document.getElementById("toast");t.textContent=msg;t.hidden=false;clearTimeout(tT);tT=setTimeout(function(){t.hidden=true;},ms||2800);}
+
+/* ===== Пароль: вход и создание защищённой копии ===== */
+var lockEl=document.getElementById("lock"),lockPw=document.getElementById("lockPw"),lockPw2=document.getElementById("lockPw2"),lockPw2Row=document.getElementById("lockPw2Row"),
+    lockErr=document.getElementById("lockErr"),lockGo=document.getElementById("lockGo"),lockSkip=document.getElementById("lockSkip"),lockT=document.getElementById("lockT"),lockH=document.getElementById("lockH");
+document.getElementById("lockEye").addEventListener("click",function(){var t=lockPw.type==="password"?"text":"password";lockPw.type=t;lockPw2.type=t;});
+lockPw.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();lockGo.click();}});
+lockPw2.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();lockGo.click();}});
+function lockErrMsg(m){lockErr.textContent=m;lockErr.hidden=!m;}
+function showLock(mode,vault){
+  var make=mode==="make";
+  lockT.textContent=make?"Пароль для защищённой копии":"Введи пароль от своих данных";
+  lockH.textContent=make?"Придумай фразу от 10 символов, например «Калина-Пежо-2026!». Запиши её — без пароля данные не восстановить, даже мне.":"Твои реквизиты и машины зашифрованы. Пароль нужен один раз на этом устройстве — дальше всё хранится в телефоне.";
+  lockPw2Row.hidden=!make;lockGo.textContent=make?"Создать vault.json":"Открыть";lockSkip.textContent=make?"Отмена":"Начать без данных";
+  lockPw.value="";lockPw2.value="";lockPw.type="password";lockPw2.type="password";lockPw.autocomplete=make?"new-password":"current-password";
+  lockErrMsg("");lockEl.hidden=false;setTimeout(function(){lockPw.focus();},120);
+  lockSkip.onclick=function(){lockEl.hidden=true;};
+  lockGo.onclick=async function(){
+    var pw=lockPw.value;if(!pw){lockPw.focus();return;}
+    if(make){
+      if(pw.length<10){lockErrMsg("Слишком короткий пароль — нужно хотя бы 10 символов.");return;}
+      if(pw!==lockPw2.value){lockErrMsg("Пароли не совпадают.");return;}
+    }
+    lockGo.disabled=true;var old=lockGo.textContent;lockGo.textContent=make?"Шифрую…":"Проверяю…";
+    try{
+      if(make){
+        var v=await Vault.seal(privatePayload(),pw);
+        await Vault.open(v,pw); // самопроверка: копия точно открывается этим паролем
+        saveFile(new Blob([JSON.stringify(v)],{type:"application/json"}),"vault.json");
+        lockEl.hidden=true;toast("Готово: vault.json сохранён. Выложи его на сайт вместо старого.",6000);
+      }else{
+        var p=await Vault.open(vault,pw);applyPrivate(p);lockEl.hidden=true;S.carId=null;go();
+        toast("Данные загружены: машин — "+(p.cars||[]).length,4000);
+      }
+    }catch(e){lockErrMsg(make?"Не удалось зашифровать: "+(e&&e.message||e):"Неверный пароль. Проверь раскладку и заглавные буквы.");}
+    lockGo.disabled=false;lockGo.textContent=old;
+  };
+}
+function saveFile(blob,name){
+  if(isIOS&&navigator.canShare){try{var f=new File([blob],name,{type:blob.type});if(navigator.canShare({files:[f]})){navigator.share({files:[f],title:name}).catch(function(){});return;}}catch(e){}}
+  var u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u);},4000);
+}
+async function maybeUnlock(force){
+  if(!force&&db.settings.landlord.fio)return;
+  var v=await Vault.fetchVault();
+  if(!v){if(force)toast("Защищённая копия не найдена на сайте (нет файла vault.json)",5000);return;}
+  if(force&&db.settings.landlord.fio&&!confirm("Заменить твои реквизиты и список машин данными из защищённой копии? Водители и журнал останутся."))return;
+  showLock("open",v);
+}
+A.unlockAgain=function(){maybeUnlock(true);};
+A.makeVault=function(){if(!db.settings.landlord.fio&&!db.cars.length){toast("Сначала заполни свои данные и машины");return;}showLock("make");};
+
+render();
+if(window.crypto&&crypto.subtle)maybeUnlock(false);
+if("serviceWorker" in navigator&&location.protocol==="https:"){window.addEventListener("load",function(){navigator.serviceWorker.register("./sw.js").catch(function(){});});}
+})();
+</script>
+</body>
+</html>
