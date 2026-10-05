@@ -128,24 +128,55 @@
     return lines.map(function (l) { return l.items.sort(function (a, b) { return a.x0 - b.x0; }).map(function (i) { return i.text; }).join(" "); }).join("\n");
   }
 
-  // canvas → { text, items }
-  async function recognize(canvas, step) {
-    step = step || function () {};
+  function rotateCanvas(src, deg) {
+    deg = ((deg % 360) + 360) % 360;
+    if (!deg) return src;
+    var c = document.createElement("canvas");
+    c.width = deg % 180 ? src.height : src.width; c.height = deg % 180 ? src.width : src.height;
+    var x = c.getContext("2d"); x.translate(c.width / 2, c.height / 2); x.rotate(deg * Math.PI / 180); x.drawImage(src, -src.width / 2, -src.height / 2);
+    return c;
+  }
+  async function detect(canvas) {
     var prep = detPrep(canvas), feeds = {};
     feeds[sDet.inputNames[0]] = prep.tensor;
-    step("Ищу строки текста…", null);
     var prob = (await sDet.run(feeds))[sDet.outputNames[0]].data;
-    var boxes = dbBoxes(prob, prep.nw, prep.nh).map(function (b) {
+    return dbBoxes(prob, prep.nw, prep.nh).map(function (b) {
       return { x0: b.x0 * prep.sx, y0: b.y0 * prep.sy, x1: b.x1 * prep.sx, y1: b.y1 * prep.sy };
-    }).slice(0, 400);
+    });
+  }
+  // Оценка «читаемости» при данном повороте: читаем до 10 самых крупных строк, сумма (уверенность × длина)
+  async function orientScore(canvas, known) {
+    var boxes = (known || await detect(canvas)).filter(function (b) { return (b.x1 - b.x0) > (b.y1 - b.y0) * 1.3; })
+      .sort(function (a, b) { return (b.x1 - b.x0) - (a.x1 - a.x0); }).slice(0, 10), score = 0;
+    for (var i = 0; i < boxes.length; i++) {
+      var r = await recBox(canvas, boxes[i], "ru");
+      if (r && r.text) score += Math.max(0, r.conf - 0.35) * r.text.replace(/\s/g, "").length;
+    }
+    return score;
+  }
+
+  // canvas → { text, items, canvas (уже правильно повёрнутый), rotation }
+  async function recognize(canvas, step) {
+    step = step || function () {};
+    step("Определяю, как повёрнут документ…", null);
+    var boxes0 = await detect(canvas), hor = 0, ver = 0;
+    boxes0.forEach(function (b) { var w = b.x1 - b.x0, h = b.y1 - b.y0; if (w > h * 1.3) hor++; else if (h > w * 1.3) ver++; });
+    var cands = ver > hor ? [90, 270] : [0, 180], best = null;
+    for (var ci = 0; ci < cands.length; ci++) {
+      var rc = rotateCanvas(canvas, cands[ci]), sc = await orientScore(rc, cands[ci] === 0 ? boxes0 : null);
+      if (!best || sc > best.score) best = { deg: cands[ci], canvas: rc, score: sc };
+      if (cands[ci] === 0 && sc > 60) break; // текст и так читается уверенно — переворот не проверяем
+    }
+    var work = best.canvas;
+    var boxes = (best.deg === 0 ? boxes0 : await detect(work)).slice(0, 400);
     var items = [];
     for (var i = 0; i < boxes.length; i++) {
       step("Читаю текст… " + (i + 1) + " из " + boxes.length, (i + 1) / boxes.length);
-      var r = await recBox(canvas, boxes[i], "ru");
+      var r = await recBox(work, boxes[i], "ru");
       if (r && r.text && r.conf >= 0.45) items.push({ x0: boxes[i].x0, y0: boxes[i].y0, x1: boxes[i].x1, y1: boxes[i].y1, text: r.text, conf: r.conf });
     }
-    return { text: toLines(items), items: items };
+    return { text: toLines(items), items: items, canvas: work, rotation: best.deg };
   }
 
-  root.Paddle = { init: init, recognize: recognize };
+  root.Paddle = { init: init, recognize: recognize, rotateCanvas: rotateCanvas };
 })(typeof window !== "undefined" ? window : globalThis);

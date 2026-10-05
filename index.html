@@ -152,6 +152,9 @@ h2.title{font-family:var(--display);font-weight:600;font-size:20px;margin:6px 0 
 .tgl{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--hair);border-radius:14px;padding:12px 14px;font-weight:600;grid-column:1/-1}
 .tgl input{width:22px;height:22px;accent-color:var(--accent);flex:none}
 .tgl span{font-weight:400;font-size:13px;color:var(--muted);display:block}
+.diag{margin-top:12px;border:1px solid var(--hair);border-radius:12px;padding:10px 12px;background:var(--surface-2)}
+.diag summary{font-weight:700;font-size:14px;cursor:pointer}
+.diag pre{white-space:pre-wrap;word-break:break-word;font-size:12.5px;line-height:1.35;margin:4px 0 10px;max-height:220px;overflow:auto}
 .banner{border-radius:14px;padding:12px 14px;font-size:14px;margin:10px 0}
 .banner.warn{background:var(--warn-soft);color:var(--ink);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent)}
 .banner.info{background:var(--accent-soft);color:var(--ink);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent)}
@@ -488,6 +491,11 @@ function scanHtml(){
   var any=S.photos.passport||S.photos.reg||S.photos.lic;
   h+='<button class="btn acc wide" style="margin-top:12px" data-act="scan"'+(any?"":" disabled")+'>Распознать</button>';
   h+='<p class="hint" style="margin:8px 2px 0">Читает нейросеть прямо в телефоне — фото никуда не отправляются и не сохраняются. Первый запуск скачает её (~22 МБ, лучше по Wi-Fi), дальше работает без интернета. <b>Совет:</b> снимай при дневном свете без вспышки, документ на тёмном фоне, без бликов. «✓ сверено» — проверено контрольными цифрами паспорта или совпало в двух местах, «⚠ проверь» — сверь глазами.</p>';
+  if(S.lastScan){var L=S.lastScan,NM={passport:"Паспорт",reg:"Прописка",lic:"Водительское"};
+    h+='<details class="diag" id="diag"'+(L.n?"":" open")+'><summary>Что прочитала нейросеть · '+(L.engine==="paddle"?"нейросеть":L.engine==="tess"?"простой движок":esc(L.engine))+", "+esc(L.sec)+" с</summary>"+
+      (L.notes.length?'<p class="hint">'+esc(L.notes.join(" "))+"</p>":"")+
+      Object.keys(L.raw).map(function(d){return "<b>"+(NM[d]||d)+":</b><pre>"+(esc(L.raw[d]).trim()||"— текст не найден —")+"</pre>";}).join("")+
+      '<p class="hint">Это видно только тебе на этом телефоне. Если поле прочиталось с ошибкой — просто исправь его в форме.</p></details>';}
   if(S.regLines.length)h+='<div class="grp">Строки с прописки — нажми, чтобы добавить в адрес</div><div class="chips">'+S.regLines.map(function(l,i){return '<button class="chip" data-act="addAddr" data-v="'+i+'">+ '+esc(l)+"</button>";}).join("")+'</div><button class="btn sm ghost" data-act="clrAddr" style="margin-top:6px">Очистить адрес</button>';
   return h+"</div>";
 }
@@ -678,7 +686,7 @@ var A={
     save();S.lastEntryId=e.id;S.step=4;go();
   },
   dl:download, share:share,
-  reset:function(){S.step=1;S.carId=null;S.driverId=null;S.draft=emptyDriver();S.flags={};S.regLines=[];S.scanOpen=false;S.warned=false;
+  reset:function(){S.lastScan=null;S.step=1;S.carId=null;S.driverId=null;S.draft=emptyDriver();S.flags={};S.regLines=[];S.scanOpen=false;S.warned=false;
     ["passport","reg","lic"].forEach(function(k){if(S.photos[k])URL.revokeObjectURL(S.photos[k].url);S.photos[k]=null;});go();},
   toggleRet:function(v){var e=entry(v);if(!e)return;e.status=e.status==="active"?"closed":"active";save();render();toast(e.status==="active"?"Договор снова активен":"Отмечено: машину вернули");},
   delLog:function(v){if(!confirm("Удалить договор из журнала?"))return;db.history=db.history.filter(function(x){return x.id!==v;});save();render();},
@@ -710,18 +718,24 @@ var A={
 /* ================= СКАН ================= */
 var ovEl=document.getElementById("ov"),ovT=document.getElementById("ovT"),ovI=document.getElementById("ovI"),ovBar=document.getElementById("ovBar");
 function runScan(){
-  ovEl.hidden=false;ovT.textContent="Подготовка…";
+  ovEl.hidden=false;ovT.textContent="Подготовка…";var t0=Date.now();
   OCR.scan(S.photos,function(label,p){ovT.textContent=label;if(p==null){ovBar.classList.add("ind");}else{ovBar.classList.remove("ind");ovI.style.width=Math.round(p*100)+"%";}})
   .then(function(r){
-    ovEl.hidden=true;var n=0;
-    for(var k in r.fields){if(k==="sex"){S.draft.sex=r.fields.sex;continue;}
-      var cur=String(S.draft[k]||"").trim();
-      if(!cur||S.flags[k]!==undefined){S.draft[k]=r.fields[k];S.flags[k]=!!r.ok[k];n++;}}
-    S.regLines=r.regLines||[];render();
-    var msg=n?("Заполнено полей: "+n+". Проверь отмеченные ⚠"):"Не удалось ничего прочитать — попробуй сфотографировать ровнее и при хорошем свете";
-    if(r.notes.length)msg+=". "+r.notes[0];toast(msg,6000);
-    var f=document.getElementById("dform");if(f&&n)f.scrollIntoView({behavior:"smooth"});
-  }).catch(function(err){ovEl.hidden=true;toast("Ошибка распознавания: "+(err&&err.message||err),6000);});
+    ovEl.hidden=true;var n=0,k,chars=0;
+    // ты нажал «Распознать» — распознанное заменяет то, что было в полях
+    for(k in r.fields){if(k==="sex"){S.draft.sex=r.fields.sex;continue;}S.draft[k]=r.fields[k];S.flags[k]=!!r.ok[k];n++;}
+    for(k in r.oriented){if(S.photos[k]&&r.oriented[k]){S.photos[k].canvas=r.oriented[k];S.photos[k].url=thumbUrl(r.oriented[k]);}}
+    for(k in r.raw)chars+=String(r.raw[k]||"").replace(/\s/g,"").length;
+    S.regLines=r.regLines||[];
+    S.lastScan={raw:r.raw||{},engine:r.engine,notes:r.notes||[],sec:((Date.now()-t0)/1000).toFixed(1),n:n,chars:chars};
+    render();
+    var msg=n?"Заполнено полей: "+n+". Проверь отмеченные ⚠"
+      :!chars?"На фото не найден текст. Проверь, что рамка стоит по краям документа, а фото чёткое и без бликов."
+      :"Текст прочитан, но поля документа не найдены. Проверь, что фото в нужной ячейке. Ниже — что прочитала нейросеть.";
+    if(r.notes.length)msg+=" "+r.notes[0];toast(msg,8000);
+    var f=document.getElementById(n?"dform":"diag");if(f)f.scrollIntoView({behavior:"smooth",block:"start"});
+  }).catch(function(err){ovEl.hidden=true;S.lastScan={raw:{},engine:"ошибка",notes:[String(err&&err.message||err)],sec:"—",n:0,chars:0};render();
+    toast("Ошибка распознавания: "+(err&&err.message||err),8000);});
 }
 
 /* ================= СОБЫТИЯ ================= */
@@ -819,6 +833,8 @@ function autoQuad(src){
     var tl=null,tr=null,br=null,bl=null,a=1e9,b=-1e9,cc=-1e9,dd=1e9;
     for(i=0;i<n;i++){if(lab[i]!==bestId)continue;var px=i%W,py=(i/W)|0,s1=px+py,s2=px-py;
       if(s1<a){a=s1;tl=[px,py];}if(s1>b){b=s1;br=[px+1,py+1];}if(s2>cc){cc=s2;tr=[px+1,py];}if(s2<dd){dd=s2;bl=[px,py+1];}}
+    var poly=[tl,tr,br,bl],ar=0;for(i=0;i<4;i++){var A1=poly[i],B1=poly[(i+1)%4];ar+=A1[0]*B1[1]-B1[0]*A1[1];}
+    if(Math.abs(ar)/2<W*H*0.15)return null;
     var k=1/S2;return [tl,tr,br,bl].map(function(pt){return [Math.min(src.width,pt[0]*k),Math.min(src.height,pt[1]*k)];});
   }catch(e){return null;}
 }

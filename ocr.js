@@ -280,7 +280,7 @@
   // photos: {passport:{canvas|file,rot}, reg:…, lic:…}; step(label, fraction)
   // Сначала нейросеть PaddleOCR (точнее), при сбое — Tesseract.
   async function scan(photos, step) {
-    var out = { fields: {}, ok: {}, regLines: [], notes: [], engine: "paddle" };
+    var out = { fields: {}, ok: {}, regLines: [], notes: [], engine: "paddle", raw: {}, oriented: {} };
     function put(src, okmap) { for (var k in src) if (src[k] && !out.fields[k]) { out.fields[k] = src[k]; out.ok[k] = !!(okmap && okmap[k]); } }
     function has(ph) { return ph && (ph.canvas || ph.file); }
     function src(ph) { return ph.canvas || ph.file; }
@@ -296,7 +296,7 @@
       step(label, null);
       if (out.engine === "paddle") {
         var r = await root.Paddle.recognize(await prepImage(src(ph), rot(ph), crop, true), function (l, p) { step(label + " " + l.replace(/^[^…]*… ?/, ""), p); });
-        return { text: fixMixedScript(r.text), raw: r.text };
+        return { text: fixMixedScript(r.text), raw: r.text, canvas: r.canvas, rotation: r.rotation };
       }
       var t = await readRus(await prepImage(src(ph), rot(ph), crop));
       return { text: t, raw: t };
@@ -304,9 +304,10 @@
 
     if (has(photos.passport)) {
       var P = photos.passport, rp = await read(P, "Читаю паспорт…"), mrz = parseMRZ(rp.raw);
-      if (!mrz.found) { // вторая попытка: нижняя часть разворота крупнее
+      out.raw.passport = rp.raw; if (rp.rotation) out.oriented.passport = rp.canvas;
+      if (!mrz.found) { // вторая попытка: нижняя часть разворота крупнее (уже в правильном повороте)
         step("Ищу машиночитаемую зону паспорта…", null);
-        if (out.engine === "paddle") mrz = parseMRZ((await read(P, "Ищу строки <<< внизу паспорта…", { y0: 0.6, y1: 1, up: 1.6 })).raw);
+        if (out.engine === "paddle") mrz = parseMRZ((await read({ canvas: rp.canvas }, "Ищу строки <<< внизу паспорта…", { y0: 0.6, y1: 1, up: 1.6 })).raw);
         else mrz = parseMRZ(await readMrz(await prepImage(src(P), rot(P), { y0: 0.62, y1: 1, up: 1 })));
       }
       var pt = parsePassportText(rp.text);
@@ -322,11 +323,13 @@
       if (!mrz.found) out.notes.push("Машиночитаемая зона паспорта не найдена — сфотографируй разворот целиком, вместе с двумя строками «<<<» внизу, ровно и без бликов.");
     }
     if (has(photos.reg)) {
-      var rg = parseRegistration((await read(photos.reg, "Читаю прописку…")).text);
+      var rr = await read(photos.reg, "Читаю прописку…"); out.raw.reg = rr.raw; if (rr.rotation) out.oriented.reg = rr.canvas;
+      var rg = parseRegistration(rr.text);
       out.regLines = rg.lines; if (rg.address) put({ address: fixVocab(rg.address) }, null);
     }
     if (has(photos.lic)) {
-      put(parseLicense((await read(photos.lic, "Читаю водительское удостоверение…")).text, out.fields.dob), null);
+      var rl = await read(photos.lic, "Читаю водительское удостоверение…"); out.raw.lic = rl.raw; if (rl.rotation) out.oriented.lic = rl.canvas;
+      put(parseLicense(rl.text, out.fields.dob), null);
     }
     step("Готово", 1);
     return out;
