@@ -406,6 +406,9 @@ function stepper(){
 }
 function viewNew(){
   var h=stepper();
+  if(S.restoredAt&&S.step<4){var rd=new Date(S.restoredAt);
+    h+='<div class="banner info"><b>Черновик восстановлен</b> — сохранён '+p2(rd.getDate())+"."+p2(rd.getMonth()+1)+" в "+p2(rd.getHours())+":"+p2(rd.getMinutes())+
+      '. Все поля на месте; фото, если нужно, добавь заново. <button class="btn sm" data-act="reset">Начать заново</button></div>';}
   if(S.step===1){
     h+='<h2 class="title">Какую машину сдаём?</h2><p class="lead">Данные авто подставятся в договор автоматически.</p>';
     if(installEvt&&!standalone)h+='<div class="banner info"><b>Установи как приложение</b> — будет открываться с рабочего стола на весь экран. <button class="btn sm acc" data-act="install" style="margin-top:8px">Установить</button></div>';
@@ -603,8 +606,35 @@ function render(){
   v.innerHTML=S.tab==="new"?viewNew():S.tab==="log"?viewLog():S.tab==="drivers"?viewDrivers():S.tab==="cars"?viewCars():viewSettings();
   [].forEach.call(document.querySelectorAll(".tab"),function(t){t.classList.toggle("on",t.getAttribute("data-v")===S.tab);});
   document.getElementById("topSub").textContent=TITLES[S.tab]||"";
+  saveDraft();
 }
 function go(){render();window.scrollTo(0,0);}
+
+/* ===== Черновик: незаконченный договор переживает выход из приложения ===== */
+var DRAFT_KEY="avtodogovor-draft-v1",draftT=0;
+function draftWorth(){return S.step>=1&&S.step<4&&(S.carId||DFIELDS.some(function(k){return String(S.draft[k]||"").trim();}));}
+function saveDraft(){
+  if(S.tab!=="new")return;
+  try{
+    if(draftWorth())localStorage.setItem(DRAFT_KEY,JSON.stringify({step:S.step,carId:S.carId,driverId:S.driverId,draft:S.draft,flags:S.flags,terms:S.terms,
+      variant:S.variant,scanOpen:S.scanOpen,regLines:S.regLines,savedAt:Date.now()}));
+    else if(S.step===1&&!S.carId)localStorage.removeItem(DRAFT_KEY);
+  }catch(e){}
+}
+function saveDraftSoon(){clearTimeout(draftT);draftT=setTimeout(saveDraft,400);}
+function clearDraft(){clearTimeout(draftT);try{localStorage.removeItem(DRAFT_KEY);}catch(e){}S.restoredAt=0;}
+function restoreDraft(){
+  try{
+    var d=JSON.parse(localStorage.getItem(DRAFT_KEY)||"null");
+    if(!d||Date.now()-(d.savedAt||0)>14*864e5)return;
+    if(d.carId&&!car(d.carId))d.carId=null;
+    S.carId=d.carId||null;S.step=S.carId?Math.min(Math.max(d.step||1,1),3):1;
+    S.driverId=d.driverId||null;S.draft=Object.assign(emptyDriver(),d.draft||{});S.flags=d.flags||{};
+    S.terms=d.terms||null;S.variant=d.variant==="noosago"?"noosago":"osago";S.scanOpen=!!d.scanOpen;S.regLines=d.regLines||[];
+    if(S.step===3&&!S.terms)S.step=2;
+    if(draftWorth())S.restoredAt=d.savedAt;
+  }catch(e){}
+}
 
 /* ================= ДОГОВОР ================= */
 function buildData(){
@@ -667,7 +697,7 @@ var A={
     if(S.step===2){var miss=missing(S.draft);if(miss.length&&!S.warned){S.warned=true;render();var b=document.querySelector(".banner.warn");if(b)b.scrollIntoView({block:"center"});return;}
       saveDraftDriver();S.warned=false;startTerms();S.step=3;go();}
   },
-  back:function(){S.step=Math.max(1,S.step-1);S.warned=false;go();},
+  back:function(){S.restoredAt=0;S.step=Math.max(1,S.step-1);S.warned=false;go();},
   variant:function(v){S.variant=v;render();},
   pickDrv:function(v){var d=drv(v);if(!d)return;S.driverId=v;S.draft=Object.assign(emptyDriver(),d);S.flags={};S.scanOpen=false;S.warned=false;render();var f=document.getElementById("dform");if(f)f.scrollIntoView({behavior:"smooth"});},
   manual:function(){S.scanOpen=false;S.driverId=null;S.draft=emptyDriver();S.flags={};S.regLines=[];S.warned=false;render();var f=document.getElementById("f-draft-fio");if(f)f.focus();},
@@ -683,10 +713,10 @@ var A={
     var data=buildData(),e={id:uid(),createdAt:Date.now(),number:T.number,date:T.date,time:T.time,variant:S.variant,carId:S.carId,driverId:S.driverId,driverName:data.driver.fio,status:"active",data:data};
     db.history.push(e);
     var n=parseInt(T.number,10);if(!isNaN(n)&&n>=(+db.settings.nextNumber||1))db.settings.nextNumber=n+1;
-    save();S.lastEntryId=e.id;S.step=4;go();
+    save();clearDraft();S.lastEntryId=e.id;S.step=4;go();
   },
   dl:download, share:share,
-  reset:function(){S.lastScan=null;S.step=1;S.carId=null;S.driverId=null;S.draft=emptyDriver();S.flags={};S.regLines=[];S.scanOpen=false;S.warned=false;
+  reset:function(){clearDraft();S.lastScan=null;S.step=1;S.carId=null;S.driverId=null;S.draft=emptyDriver();S.flags={};S.regLines=[];S.scanOpen=false;S.warned=false;
     ["passport","reg","lic"].forEach(function(k){if(S.photos[k])URL.revokeObjectURL(S.photos[k].url);S.photos[k]=null;});go();},
   toggleRet:function(v){var e=entry(v);if(!e)return;e.status=e.status==="active"?"closed":"active";save();render();toast(e.status==="active"?"Договор снова активен":"Отмечено: машину вернули");},
   delLog:function(v){if(!confirm("Удалить договор из журнала?"))return;db.history=db.history.filter(function(x){return x.id!==v;});save();render();},
@@ -718,9 +748,13 @@ var A={
 /* ================= СКАН ================= */
 var ovEl=document.getElementById("ov"),ovT=document.getElementById("ovT"),ovI=document.getElementById("ovI"),ovBar=document.getElementById("ovBar");
 function runScan(){
-  ovEl.hidden=false;ovT.textContent="Подготовка…";var t0=Date.now();
-  OCR.scan(S.photos,function(label,p){ovT.textContent=label;if(p==null){ovBar.classList.add("ind");}else{ovBar.classList.remove("ind");ovI.style.width=Math.round(p*100)+"%";}})
-  .then(function(r){
+  if(S.scanning)return; // уже распознаём — второе нажатие игнорируем
+  S.scanning=true;ovEl.hidden=false;ovT.textContent="Распознаю…";ovBar.classList.add("ind");ovI.style.width="0%";var t0=Date.now();
+  // даём экрану показать окно «Распознаю…» ДО тяжёлых вычислений (иначе при повторном запуске, когда
+  // нейросеть уже загружена, вычисления начинаются мгновенно и экран выглядит зависшим)
+  var painted=new Promise(function(res){var done=false,f=function(){if(!done){done=true;res();}};requestAnimationFrame(function(){setTimeout(f,30);});setTimeout(f,200);});
+  painted.then(function(){return OCR.scan(S.photos,function(label,p){ovT.textContent=label;if(p==null){ovBar.classList.add("ind");}else{ovBar.classList.remove("ind");ovI.style.width=Math.round(p*100)+"%";}});})
+  .then(function(r){S.scanning=false;
     ovEl.hidden=true;var n=0,k,chars=0;
     // ты нажал «Распознать» — распознанное заменяет то, что было в полях
     for(k in r.fields){if(k==="sex"){S.draft.sex=r.fields.sex;continue;}S.draft[k]=r.fields[k];S.flags[k]=!!r.ok[k];n++;}
@@ -734,7 +768,7 @@ function runScan(){
       :"Текст прочитан, но поля документа не найдены. Проверь, что фото в нужной ячейке. Ниже — что прочитала нейросеть.";
     if(r.notes.length)msg+=" "+r.notes[0];toast(msg,8000);
     var f=document.getElementById(n?"dform":"diag");if(f)f.scrollIntoView({behavior:"smooth",block:"start"});
-  }).catch(function(err){ovEl.hidden=true;S.lastScan={raw:{},engine:"ошибка",notes:[String(err&&err.message||err)],sec:"—",n:0,chars:0};render();
+  }).catch(function(err){S.scanning=false;ovEl.hidden=true;S.lastScan={raw:{},engine:"ошибка",notes:[String(err&&err.message||err)],sec:"—",n:0,chars:0};render();
     toast("Ошибка распознавания: "+(err&&err.message||err),8000);});
 }
 
@@ -761,6 +795,7 @@ document.addEventListener("input",function(e){
   if(m==="draft"&&S.flags[k]!==undefined){delete S.flags[k];var w=document.querySelector('[data-wrap="draft-'+k+'"]');if(w){w.classList.remove("ok","check");var bd=w.querySelector(".b");if(bd)bd.remove();}}
   if(m==="land"||m==="pay"||m==="set")save();
   if(m==="draft")S.warned=false;
+  if(m==="draft"||m==="terms")saveDraftSoon();
 });
 document.addEventListener("change",function(e){
   var el=e.target;
@@ -927,6 +962,7 @@ async function maybeUnlock(force){
 A.unlockAgain=function(){maybeUnlock(true);};
 A.makeVault=function(){if(!db.settings.landlord.fio&&!db.cars.length){toast("Сначала заполни свои данные и машины");return;}showLock("make");};
 
+restoreDraft();
 render();
 if(window.crypto&&crypto.subtle)maybeUnlock(false);
 if("serviceWorker" in navigator&&location.protocol==="https:"){window.addEventListener("load",function(){navigator.serviceWorker.register("./sw.js").catch(function(){});});}

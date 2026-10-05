@@ -195,8 +195,105 @@
   var ADDR_STOP = /(ЗАРЕГИСТРИРОВАН|МЕСТО\s*ЖИТЕЛЬСТВА|ОТДЕЛ|МВД|УФМС|ГУВМ|ПОДПИСЬ|ДОЛЖНОСТН|СНЯТ|ВОИНСК|РЕГИСТРАЦ|ВЫДАН|ПАСПОРТ)/;
   function parseRegistration(t) {
     var lines = String(t || "").toUpperCase().split("\n").map(function (s) { return tidy(s); }).filter(function (s) { return s.length >= 3; });
+    var pa = parseAddress(String(t || ""));
+    if (pa.address) return { address: pa.address, lines: lines };
     var cand = lines.filter(function (l) { return ADDR_KW.test(l) && !ADDR_STOP.test(l); });
     return { address: cand.join(", ").replace(/\s*,\s*,/g, ","), lines: lines };
+  }
+
+
+  /* ---------- адрес из штампа прописки: только город/область, район, улица, дом, корпус, квартира ---------- */
+  var MONTHS_RU = { "ЯНВАРЯ": 1, "ФЕВРАЛЯ": 2, "МАРТА": 3, "АПРЕЛЯ": 4, "МАЯ": 5, "ИЮНЯ": 6, "ИЮЛЯ": 7, "АВГУСТА": 8, "СЕНТЯБРЯ": 9, "ОКТЯБРЯ": 10, "НОЯБРЯ": 11, "ДЕКАБРЯ": 12 };
+  function stampDate(t) {
+    var U = String(t || "").toUpperCase(), m = /(\d{1,2})\D{0,4}(ЯНВАРЯ|ФЕВРАЛЯ|МАРТА|АПРЕЛЯ|МАЯ|ИЮНЯ|ИЮЛЯ|АВГУСТА|СЕНТЯБРЯ|ОКТЯБРЯ|НОЯБРЯ|ДЕКАБРЯ)\D{0,4}((?:19|20)\d{2})/.exec(U);
+    if (m) return +m[3] * 10000 + MONTHS_RU[m[2]] * 100 + +m[1];
+    m = /(\d{2})[.,](\d{2})[.,]((?:19|20)\d{2})/.exec(U);
+    return m ? +m[3] * 10000 + +m[2] * 100 + +m[1] : 0;
+  }
+  function titleRu(s) { return String(s).toLowerCase().replace(/(^|[\s\-«"(])([а-яё])/g, function (_, a, b) { return a + b.toUpperCase(); }); }
+  // служебные строки штампа — это не адрес
+  var STAMP_SERVICE = /(РЕГ\.?\s*ОРГАН|УФМС|ОУФМС|ОТДЕЛ|ОВМ|ГУВМ|УВМ|МВД|УМВД|ТП\s*№|ПОДПИСЬ|ДОЛЖНОСТН|ПАСПОРТН|МИГРАЦ|ПОДРАЗДЕЛ|М\.\s*П\.|ЗАРЕГИСТРИРОВАН|СНЯТ|МЕСТО\s*ЖИТЕЛЬСТВА|РЕГИСТРАЦ|\d{1,2}\s*(ЯНВАРЯ|ФЕВРАЛЯ|МАРТА|АПРЕЛЯ|МАЯ|ИЮНЯ|ИЮЛЯ|АВГУСТА|СЕНТЯБРЯ|ОКТЯБРЯ|НОЯБРЯ|ДЕКАБРЯ))/;
+  var STREET_T = [["ПР-КТ|ПРОСП\\.?|ПРОСПЕКТ", "пр-кт"], ["УЛ\\.?|УЛИЦА", "ул."], ["ПЕР\\.?|ПЕРЕУЛОК", "пер."], ["НАБ\\.?|НАБЕРЕЖНАЯ", "наб."], ["Ш\\.|ШОССЕ", "ш."],
+    ["Б-Р|БУЛЬВАР", "б-р"], ["ПЛ\\.?|ПЛОЩАДЬ", "пл."], ["ПР-Д|ПРОЕЗД", "пр-д"], ["АЛЛЕЯ", "аллея"], ["ТУПИК", "туп."]];
+  var STREET_ANY = STREET_T.map(function (t) { return t[0]; }).join("|");
+  function streetType(w) { w = String(w || ""); for (var i = 0; i < STREET_T.length; i++) if (new RegExp("^(" + STREET_T[i][0] + ")$").test(w)) return STREET_T[i][1]; return ""; }
+  var CITY_FED = /(САНКТ-ПЕТЕРБУРГ|МОСКВА|СЕВАСТОПОЛЬ)/;
+  function cleanName(s) { return String(s || "").replace(/[,;:]+/g, " ").replace(/\s+/g, " ").replace(/^[\s.\-]+|[\s\-]+$/g, "").trim(); }
+
+  function parseAddress(text) {
+    var lines = String(text || "").toUpperCase().split("\n").map(function (l) { return l.replace(/[«»“”]/g, "\"").replace(/\s+/g, " ").trim(); })
+      .filter(function (l) { return l && !STAMP_SERVICE.test(l); });
+    var all = " " + lines.join(" , ") + " ", m, A = {}, cnt = 0;
+    // дом, корпус, строение, литера, квартира
+    if ((m = /[\s,.](?:ДОМ|Д)\.?\s*(\d+[А-Я]?(?:\/\d+[А-Я]?)?)(?=[\s,.]|$)/.exec(all))) { A.house = m[1]; cnt++; }
+    if ((m = /[\s,.](?:КОРП(?:УС)?|К)\.?\s*(\d+[А-Я]?)(?=[\s,.]|$)/.exec(all))) { A.korp = m[1]; cnt++; }
+    if ((m = /[\s,.](?:СТР(?:ОЕНИЕ)?)\.?\s*(\d+)/.exec(all))) A.str = m[1];
+    if ((m = /[\s,.](?:ЛИТ(?:ЕРА)?)\.?\s*([А-Я])(?=[\s,.]|$)/.exec(all))) A.lit = m[1];
+    if ((m = /[\s,.](?:КВ(?:АРТИРА)?)\.?\s*(\d+[А-Я]?)/.exec(all))) { A.kv = m[1]; cnt++; }
+    // область / край / республика
+    if ((m = /[\s,]([А-ЯЁ-]{4,}(?:АЯ|ИЙ|ОЙ))\s+(ОБЛ\.?|ОБЛАСТЬ|КРАЙ)(?=[\s,.]|$)/.exec(all)) || (m = /[\s,](?:ОБЛ\.?|ОБЛАСТЬ|КРАЙ)\s+([А-ЯЁ-]{4,})/.exec(all)))
+      A.region = titleRu(m[1]) + (/КРАЙ/.test(m[0]) ? " край" : " обл.");
+    else if ((m = /[\s,](?:РЕСП\.?|РЕСПУБЛИКА)\s+([А-ЯЁ-]{3,})/.exec(all))) A.region = "Респ. " + titleRu(m[1]);
+    // район
+    if ((m = /[\s,](?:Р-Н|Р-ОН|РАЙОН)\.?\s+([А-ЯЁ-]{4,})/.exec(all)) || (m = /[\s,]([А-ЯЁ-]{4,})\s+(?:Р-Н|Р-ОН|РАЙОН)(?=[\s,.]|$)/.exec(all))) { A.district = titleRu(m[1]) + " р-н"; cnt++; }
+    // город / населённый пункт (тип перед названием, метка штампа «Пункт» или город федерального значения)
+    if ((m = /[\s,](?:Г|ГОР|ГОРОД)\.?\s+([А-ЯЁ][А-ЯЁ-]{2,})/.exec(all))) A.city = "г. " + titleRu(m[1]);
+    else if ((m = /[\s,](ПОС\.?|ПОСЁЛОК|ПОСЕЛОК|ПГТ|ДЕР\.?|ДЕРЕВНЯ|СЕЛО|С\.|СНТ|ТЕР\.?|ТЕРРИТОРИЯ|ДП|РП|МКР\.?)\s+("?[А-ЯЁ0-9][А-ЯЁ0-9 -]*?"?)(?=\s*(?:,|$))/.exec(all))) {
+      var st = m[1].replace(/\.$/, ""), stMap = { "ПОС": "пос.", "ПОСЁЛОК": "пос.", "ПОСЕЛОК": "пос.", "ПГТ": "пгт", "ДЕР": "дер.", "ДЕРЕВНЯ": "дер.", "СЕЛО": "с.", "С": "с.", "СНТ": "СНТ", "ТЕР": "тер.", "ТЕРРИТОРИЯ": "тер.", "ДП": "дп", "РП": "рп", "МКР": "мкр." };
+      A.city = (stMap[st] || st.toLowerCase()) + " " + titleRu(cleanName(m[2]));
+    } else if ((m = /[\s,]ПУНКТ\.?\s+([А-ЯЁ][А-ЯЁ-]{2,})/.exec(all))) A.city = (CITY_FED.test(m[1]) ? "г. " : "") + titleRu(m[1]);
+    else if ((m = CITY_FED.exec(all))) A.city = "г. " + titleRu(m[1]);
+    if (A.city) cnt++;
+    // улица: «ПР-КТ БОГАТЫРСКИЙ», «УЛ. ПР-КТ БОГАТЫРСКИЙ» (метка штампа + тип), «БОГАТЫРСКИЙ ПР-КТ»
+    var reT = new RegExp("[\\s,](" + STREET_ANY + ")\\s+(?:(" + STREET_ANY + ")\\s+)?([А-ЯЁ0-9][А-ЯЁ0-9 .-]*?)(?=\\s*(?:,|$|(?:ДОМ|Д)\\.?\\s*\\d))");
+    if ((m = reT.exec(all))) { A.street = (streetType(m[2]) || streetType(m[1]) || "ул.") + " " + titleRu(cleanName(m[3])); cnt++; }
+    else if ((m = new RegExp("[\\s,]([А-ЯЁ][А-ЯЁ0-9 -]{2,}?)\\s+(" + STREET_ANY + ")(?=[\\s,]|$)").exec(all))) { A.street = (streetType(m[2]) || "ул.") + " " + titleRu(cleanName(m[1])); cnt++; }
+    var parts = A.region ? [A.region, A.district, A.city] : [A.city, A.district];
+    parts = parts.concat([A.street, A.house && "д. " + A.house, A.korp && "корп. " + A.korp, A.str && "стр. " + A.str, A.lit && "лит. " + A.lit, A.kv && "кв. " + A.kv]);
+    var ok = !!(A.house && (A.street || A.city));
+    return { address: ok ? parts.filter(Boolean).join(", ") : "", parts: A, count: cnt };
+  }
+
+  /* ---------- раскладка страницы прописки: колонки и штампы ---------- */
+  function linesOf(items) {
+    var arr = items.slice().sort(function (a, b) { return (a.y0 + a.y1) - (b.y0 + b.y1); }), lines = [];
+    arr.forEach(function (it) {
+      var cy = (it.y0 + it.y1) / 2, h = it.y1 - it.y0, L = null;
+      for (var i = 0; i < lines.length; i++) if (Math.abs(lines[i].cy - cy) < Math.min(lines[i].h, h) * 0.5) { L = lines[i]; break; }
+      if (L) { L.items.push(it); L.cy = (L.cy * L.n + cy) / (L.n + 1); L.n++; L.h = Math.max(L.h, h); } else lines.push({ cy: cy, h: h, n: 1, items: [it] });
+    });
+    lines.sort(function (a, b) { return a.cy - b.cy; });
+    return lines.map(function (l) { return l.items.sort(function (a, b) { return a.x0 - b.x0; }).map(function (i) { return i.text; }).join(" "); }).join("\n");
+  }
+  // штампы стоят в две колонки: ищем вертикальный «коридор» без текста и делим страницу
+  function splitColumns(items) {
+    if (!items || items.length < 6) return [items || []];
+    var X0 = Infinity, X1 = -Infinity, best = null;
+    items.forEach(function (i) { X0 = Math.min(X0, i.x0); X1 = Math.max(X1, i.x1); });
+    for (var f = 0.3; f <= 0.701; f += 0.01) {
+      var x = X0 + (X1 - X0) * f, cross = 0, L = 0, R = 0;
+      items.forEach(function (i) { if (i.x0 < x && i.x1 > x) cross++; else if (i.x1 <= x) L++; else R++; });
+      if (cross === 0 && L >= 3 && R >= 3 && (!best || Math.min(L, R) > best.s)) best = { x: x, s: Math.min(L, R) };
+    }
+    if (!best) return [items];
+    return [items.filter(function (i) { return i.x1 <= best.x; }), items.filter(function (i) { return i.x0 >= best.x; })];
+  }
+  // строки с координатами → адрес из самого свежего штампа «Зарегистрирован»
+  function parseRegistrationItems(items) {
+    var blocks = [], allLines = [];
+    splitColumns(items).forEach(function (col) {
+      var txt = fixMixedScript(linesOf(col)).toUpperCase();
+      allLines = allLines.concat(txt.split("\n"));
+      txt.split(/(?=ЗАРЕГИСТРИРОВАН)/).forEach(function (b) { if (b.trim()) blocks.push(b); });
+    });
+    var best = null;
+    blocks.forEach(function (b) {
+      var a = parseAddress(b); if (!a.address) return;
+      var c = { addr: a.address, date: stampDate(b), n: a.count, reg: /ЗАРЕГИСТРИРОВАН/.test(b) };
+      if (!best || (c.reg && !best.reg) || (c.reg === best.reg && (c.date > best.date || (c.date === best.date && c.n > best.n)))) best = c;
+    });
+    var lines = allLines.map(tidy).filter(function (s) { return s.length >= 3; });
+    return { address: best ? fixVocab(best.addr) : "", lines: lines };
   }
 
   /* ---------- водительское удостоверение ---------- */
@@ -296,7 +393,7 @@
       step(label, null);
       if (out.engine === "paddle") {
         var r = await root.Paddle.recognize(await prepImage(src(ph), rot(ph), crop, true), function (l, p) { step(label + " " + l.replace(/^[^…]*… ?/, ""), p); });
-        return { text: fixMixedScript(r.text), raw: r.text, canvas: r.canvas, rotation: r.rotation };
+        return { text: fixMixedScript(r.text), raw: r.text, canvas: r.canvas, rotation: r.rotation, items: r.items };
       }
       var t = await readRus(await prepImage(src(ph), rot(ph), crop));
       return { text: t, raw: t };
@@ -324,8 +421,9 @@
     }
     if (has(photos.reg)) {
       var rr = await read(photos.reg, "Читаю прописку…"); out.raw.reg = rr.raw; if (rr.rotation) out.oriented.reg = rr.canvas;
-      var rg = parseRegistration(rr.text);
-      out.regLines = rg.lines; if (rg.address) put({ address: fixVocab(rg.address) }, null);
+      var rg = rr.items && rr.items.length ? parseRegistrationItems(rr.items) : parseRegistration(rr.text);
+      if (!rg.address) { var rg2 = parseRegistration(rr.text); if (rg2.address) rg.address = rg2.address; }
+      out.regLines = rg.lines; if (rg.address) put({ address: rg.address }, null);
     }
     if (has(photos.lic)) {
       var rl = await read(photos.lic, "Читаю водительское удостоверение…"); out.raw.lic = rl.raw; if (rl.rotation) out.oriented.lic = rl.canvas;
@@ -335,7 +433,7 @@
     return out;
   }
 
-  var api = { fixVocab: fixVocab, expandDigits: expandDigits, fixMixedScript: fixMixedScript, reconcileFio: reconcileFio, parseMRZ: parseMRZ, parsePassportText: parsePassportText, parseRegistration: parseRegistration, parseLicense: parseLicense, checkDigit: checkDigit, decodeName: decodeName, RU_MRZ: RU_MRZ, scan: scan, prepImage: prepImage };
+  var api = { parseAddress: parseAddress, parseRegistrationItems: parseRegistrationItems, splitColumns: splitColumns, stampDate: stampDate, fixVocab: fixVocab, expandDigits: expandDigits, fixMixedScript: fixMixedScript, reconcileFio: reconcileFio, parseMRZ: parseMRZ, parsePassportText: parsePassportText, parseRegistration: parseRegistration, parseLicense: parseLicense, checkDigit: checkDigit, decodeName: decodeName, RU_MRZ: RU_MRZ, scan: scan, prepImage: prepImage };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.OCR = api;
 })(typeof window !== "undefined" ? window : globalThis);

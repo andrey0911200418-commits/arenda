@@ -128,6 +128,13 @@
     return lines.map(function (l) { return l.items.sort(function (a, b) { return a.x0 - b.x0; }).map(function (i) { return i.text; }).join(" "); }).join("\n");
   }
 
+  // отдаём управление браузеру, чтобы он перерисовал экран (без этого прогресс «замирает»)
+  function yieldUI() {
+    return new Promise(function (r) {
+      if (typeof MessageChannel !== "undefined") { var c = new MessageChannel(); c.port1.onmessage = function () { r(); }; c.port2.postMessage(0); }
+      else setTimeout(r, 0);
+    });
+  }
   function rotateCanvas(src, deg) {
     deg = ((deg % 360) + 360) % 360;
     if (!deg) return src;
@@ -137,6 +144,7 @@
     return c;
   }
   async function detect(canvas) {
+    await yieldUI();
     var prep = detPrep(canvas), feeds = {};
     feeds[sDet.inputNames[0]] = prep.tensor;
     var prob = (await sDet.run(feeds))[sDet.outputNames[0]].data;
@@ -149,6 +157,7 @@
     var boxes = (known || await detect(canvas)).filter(function (b) { return (b.x1 - b.x0) > (b.y1 - b.y0) * 1.3; })
       .sort(function (a, b) { return (b.x1 - b.x0) - (a.x1 - a.x0); }).slice(0, 10), score = 0;
     for (var i = 0; i < boxes.length; i++) {
+      await yieldUI();
       var r = await recBox(canvas, boxes[i], "ru");
       if (r && r.text) score += Math.max(0, r.conf - 0.35) * r.text.replace(/\s/g, "").length;
     }
@@ -172,6 +181,7 @@
     var items = [];
     for (var i = 0; i < boxes.length; i++) {
       step("Читаю текст… " + (i + 1) + " из " + boxes.length, (i + 1) / boxes.length);
+      await yieldUI();
       var r = await recBox(work, boxes[i], "ru");
       if (r && r.text && r.conf >= 0.45) items.push({ x0: boxes[i].x0, y0: boxes[i].y0, x1: boxes[i].x1, y1: boxes[i].y1, text: r.text, conf: r.conf });
     }
