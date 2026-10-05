@@ -201,6 +201,19 @@ h2.title{font-family:var(--display);font-weight:600;font-size:20px;margin:6px 0 
 .bar.ind i{width:35%;animation:slide 1.1s ease-in-out infinite}
 @keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}
 .ov .hint{margin-top:10px}
+/* кадрирование документа */
+.crop{position:fixed;inset:0;z-index:80;background:#0b0f16;color:#fff;display:flex;flex-direction:column;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px);touch-action:none;user-select:none;-webkit-user-select:none}
+.crop-top{padding:12px 16px 8px}
+.crop-top b{display:block;font-size:16px}
+.crop-top span{font-size:13px;color:#9aa6ba}
+.crop-stage{flex:1;position:relative;overflow:hidden;min-height:0}
+#cropCv{position:absolute}
+#cropSvg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.hnd{position:absolute;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;border:3px solid #F0A01F;background:rgba(240,160,31,.22);touch-action:none;cursor:grab}
+.hnd::after{content:"";position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:#F0A01F}
+.crop-bar{display:flex;gap:8px;padding:10px 16px 14px}
+.crop-bar button{flex:1;min-height:50px;border-radius:14px;border:1px solid #2a3344;background:#151b26;color:#fff;font:inherit;font-weight:700;font-size:15px}
+.crop-bar .ok{background:#F0A01F;color:#1A1405;border-color:transparent;flex:1.4}
 .lockbox{display:flex;flex-direction:column;gap:10px;text-align:center}
 .lockbox b{margin:0;font-size:17px}
 .lockbox .hint{margin:0}
@@ -243,11 +256,18 @@ h2.title{font-family:var(--display);font-weight:600;font-size:20px;margin:6px 0 
   <button class="btn pri wide" id="lockGo">Открыть</button>
   <button class="btn ghost wide" id="lockSkip">Начать без данных</button>
 </div></div>
+<div class="crop" id="crop" hidden>
+  <div class="crop-top"><b id="cropT">Подгони рамку по краям документа</b><span>Тяни за 4 уголка — документ выпрямится, и распознавание станет точнее</span></div>
+  <div class="crop-stage" id="cropStage"><canvas id="cropCv"></canvas><svg id="cropSvg"></svg>
+    <div class="hnd" data-i="0"></div><div class="hnd" data-i="1"></div><div class="hnd" data-i="2"></div><div class="hnd" data-i="3"></div></div>
+  <div class="crop-bar"><button id="cropRot" aria-label="Повернуть">↻</button><button id="cropAll">Весь кадр</button><button id="cropCancel">Отмена</button><button id="cropOk" class="ok">Готово</button></div>
+</div>
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="contract.js"></script>
 <script src="ocr.js"></script>
+<script src="paddle.js"></script>
 <script>
 (function(){
 "use strict";
@@ -460,14 +480,14 @@ function scanHtml(){
   var SL=[["passport","Паспорт — разворот с фото","Целиком, вместе с двумя строками «<<<» внизу"],["reg","Прописка","Страница со штампом регистрации"],["lic","Водительское — лицевая сторона","Оборот не нужен: в договор идут номер, дата и кем выдано"]];
   var h='<div class="card" style="margin-top:10px"><div class="slots">'+SL.map(function(s){
     var ph=S.photos[s[0]];
-    return '<div class="slot'+(ph?" has":"")+'"><div class="thumb">'+(ph?'<img src="'+ph.url+'" style="transform:rotate('+ph.rot+'deg)" alt="">':"🪪")+'</div><div><b>'+s[1]+'</b><span class="hint">'+s[2]+'</span><div class="bt">'+
-      (ph?'<button class="btn sm" data-act="rot" data-v="'+s[0]+'">↻ Повернуть</button><button class="btn sm" data-act="unphoto" data-v="'+s[0]+'">Убрать</button>':
+    return '<div class="slot'+(ph?" has":"")+'"><div class="thumb">'+(ph?'<img src="'+ph.url+'" alt="">':"🪪")+'</div><div><b>'+s[1]+'</b><span class="hint">'+s[2]+'</span><div class="bt">'+
+      (ph?'<button class="btn sm" data-act="recrop" data-v="'+s[0]+'">✂ Рамка</button><button class="btn sm" data-act="rot" data-v="'+s[0]+'">↻</button><button class="btn sm" data-act="unphoto" data-v="'+s[0]+'">Убрать</button>':
       '<label class="btn sm filebtn">📷 Снять<input type="file" accept="image/*" capture="environment" data-photo="'+s[0]+'"></label><label class="btn sm filebtn">Из галереи<input type="file" accept="image/*" data-photo="'+s[0]+'"></label>')+
       "</div></div></div>";
   }).join("")+"</div>";
   var any=S.photos.passport||S.photos.reg||S.photos.lic;
   h+='<button class="btn acc wide" style="margin-top:12px" data-act="scan"'+(any?"":" disabled")+'>Распознать</button>';
-  h+='<p class="hint" style="margin:8px 2px 0">Распознавание идёт прямо в телефоне — фото никуда не отправляются и не сохраняются. Первый запуск скачает словарь (~15 МБ), дальше работает офлайн. Поля с «✓ сверено» проверены по контрольным цифрам паспорта, с «⚠ проверь» — сверь глазами.</p>';
+  h+='<p class="hint" style="margin:8px 2px 0">Читает нейросеть прямо в телефоне — фото никуда не отправляются и не сохраняются. Первый запуск скачает её (~22 МБ, лучше по Wi-Fi), дальше работает без интернета. <b>Совет:</b> снимай при дневном свете без вспышки, документ на тёмном фоне, без бликов. «✓ сверено» — проверено контрольными цифрами паспорта или совпало в двух местах, «⚠ проверь» — сверь глазами.</p>';
   if(S.regLines.length)h+='<div class="grp">Строки с прописки — нажми, чтобы добавить в адрес</div><div class="chips">'+S.regLines.map(function(l,i){return '<button class="chip" data-act="addAddr" data-v="'+i+'">+ '+esc(l)+"</button>";}).join("")+'</div><button class="btn sm ghost" data-act="clrAddr" style="margin-top:6px">Очистить адрес</button>';
   return h+"</div>";
 }
@@ -644,8 +664,9 @@ var A={
   pickDrv:function(v){var d=drv(v);if(!d)return;S.driverId=v;S.draft=Object.assign(emptyDriver(),d);S.flags={};S.scanOpen=false;S.warned=false;render();var f=document.getElementById("dform");if(f)f.scrollIntoView({behavior:"smooth"});},
   manual:function(){S.scanOpen=false;S.driverId=null;S.draft=emptyDriver();S.flags={};S.regLines=[];S.warned=false;render();var f=document.getElementById("f-draft-fio");if(f)f.focus();},
   scanToggle:function(){S.scanOpen=!S.scanOpen;if(S.scanOpen&&S.driverId){S.driverId=null;S.draft=emptyDriver();S.flags={};}render();},
-  rot:function(v){S.photos[v].rot=(S.photos[v].rot+90)%360;render();},
-  unphoto:function(v){if(S.photos[v])URL.revokeObjectURL(S.photos[v].url);S.photos[v]=null;render();},
+  rot:function(v){var ph=S.photos[v];if(!ph)return;ph.canvas=rotCanvas(ph.canvas);ph.url=thumbUrl(ph.canvas);render();},
+  unphoto:function(v){S.photos[v]=null;render();},
+  recrop:function(v){var ph=S.photos[v];if(ph&&ph.src)openCrop(v,ph.src,ph.quad);},
   scan:runScan,
   addAddr:function(v){var l=S.regLines[+v];if(!l)return;S.draft.address=(S.draft.address?S.draft.address+", ":"")+l;S.flags.address=false;render();},
   clrAddr:function(){S.draft.address="";delete S.flags.address;render();},
@@ -729,8 +750,8 @@ document.addEventListener("input",function(e){
 });
 document.addEventListener("change",function(e){
   var el=e.target;
-  if(el.matches("input[data-photo]")&&el.files&&el.files[0]){var k=el.getAttribute("data-photo");if(S.photos[k])URL.revokeObjectURL(S.photos[k].url);
-    S.photos[k]={file:el.files[0],url:URL.createObjectURL(el.files[0]),rot:0};render();}
+  if(el.matches("input[data-photo]")&&el.files&&el.files[0]){var k=el.getAttribute("data-photo"),f=el.files[0];el.value="";
+    loadPhoto(f).then(function(c){openCrop(k,c,null);}).catch(function(err){toast("Не удалось открыть фото: "+(err&&err.message||err),5000);});}
   if(el.type==="checkbox"&&el.getAttribute("data-m")){target(el.getAttribute("data-m"))[el.getAttribute("data-k")]=el.checked;save();render();return;}
   if(el.id==="restoreInp"&&el.files&&el.files[0]){var rd=new FileReader();rd.onload=function(){try{var o=JSON.parse(rd.result);if(!o||!o.v||!o.cars)throw new Error("не похоже на копию АвтоДоговора");
       if(!confirm("Заменить текущие данные данными из копии?"))return;db=o;save();go();toast("Данные восстановлены");}catch(err){toast("Ошибка: "+err.message);}};rd.readAsText(el.files[0]);}
@@ -739,6 +760,106 @@ document.addEventListener("keydown",function(e){
   if(e.key==="Enter"&&e.target.id&&e.target.id.indexOf("ci-")===0){e.preventDefault();var sc=e.target.id.slice(3);addItem(sc==="car"?S.editCar:S.terms,sc);}
 });
 var tT=0;function toast(msg,ms){var t=document.getElementById("toast");t.textContent=msg;t.hidden=false;clearTimeout(tT);tT=setTimeout(function(){t.hidden=true;},ms||2800);}
+
+/* ===== Кадрирование: 4 уголка + выпрямление перспективы ===== */
+async function loadPhoto(file){ // фото → canvas (с учётом поворота из EXIF), не больше 2600 px
+  var bmp=null;
+  if(typeof createImageBitmap==="function"){try{bmp=await createImageBitmap(file,{imageOrientation:"from-image"});}catch(e){try{bmp=await createImageBitmap(file);}catch(e2){}}}
+  if(!bmp){var u=URL.createObjectURL(file),img=new Image();img.src=u;await(img.decode?img.decode():new Promise(function(ok,bad){img.onload=ok;img.onerror=bad;}));URL.revokeObjectURL(u);bmp=img;}
+  var w=bmp.naturalWidth||bmp.width,h=bmp.naturalHeight||bmp.height,s=Math.min(1,2600/Math.max(w,h));
+  var c=document.createElement("canvas");c.width=Math.round(w*s);c.height=Math.round(h*s);c.getContext("2d").drawImage(bmp,0,0,c.width,c.height);
+  if(bmp.close)bmp.close();return c;
+}
+function rotCanvas(src){var c=document.createElement("canvas");c.width=src.height;c.height=src.width;var x=c.getContext("2d");x.translate(c.width,0);x.rotate(Math.PI/2);x.drawImage(src,0,0);return c;}
+function thumbUrl(c){var s=Math.min(1,240/Math.max(c.width,c.height)),t=document.createElement("canvas");t.width=Math.round(c.width*s);t.height=Math.round(c.height*s);t.getContext("2d").drawImage(c,0,0,t.width,t.height);return t.toDataURL("image/jpeg",0.8);}
+function solve8(A,b){ // метод Гаусса для системы 8×8
+  var n=8,i,j,k;for(i=0;i<n;i++)A[i]=A[i].concat([b[i]]);
+  for(i=0;i<n;i++){var p=i;for(k=i+1;k<n;k++)if(Math.abs(A[k][i])>Math.abs(A[p][i]))p=k;var t=A[i];A[i]=A[p];A[p]=t;
+    for(k=i+1;k<n;k++){var f=A[k][i]/A[i][i];for(j=i;j<=n;j++)A[k][j]-=f*A[i][j];}}
+  var x=new Array(n);for(i=n-1;i>=0;i--){var s=A[i][n];for(j=i+1;j<n;j++)s-=A[i][j]*x[j];x[i]=s/A[i][i];}return x;
+}
+function warpQuad(src,q){ // q: [ЛВ, ПВ, ПН, ЛН] в пикселях исходника → ровный прямоугольник
+  var d=function(a,b){return Math.hypot(a[0]-b[0],a[1]-b[1]);};
+  var W=Math.max(d(q[0],q[1]),d(q[3],q[2])),H=Math.max(d(q[0],q[3]),d(q[1],q[2])),s=Math.min(1,2000/Math.max(W,H));
+  W=Math.max(16,Math.round(W*s));H=Math.max(16,Math.round(H*s));
+  var dst=[[0,0],[W,0],[W,H],[0,H]],A=[],B=[];
+  for(var i=0;i<4;i++){var u=dst[i][0],v=dst[i][1],x=q[i][0],y=q[i][1];A.push([u,v,1,0,0,0,-u*x,-v*x]);B.push(x);A.push([0,0,0,u,v,1,-u*y,-v*y]);B.push(y);}
+  var h=solve8(A,B),sw=src.width,sh=src.height,sd=src.getContext("2d").getImageData(0,0,sw,sh).data;
+  var out=document.createElement("canvas");out.width=W;out.height=H;var oc=out.getContext("2d"),oi=oc.createImageData(W,H),od=oi.data;
+  for(var vv=0;vv<H;vv++)for(var uu=0;uu<W;uu++){
+    var den=h[6]*uu+h[7]*vv+1,X=(h[0]*uu+h[1]*vv+h[2])/den,Y=(h[3]*uu+h[4]*vv+h[5])/den,x0=Math.floor(X),y0=Math.floor(Y),fx=X-x0,fy=Y-y0;
+    if(x0<0){x0=0;fx=0;}if(y0<0){y0=0;fy=0;}if(x0>sw-2){x0=sw-2;fx=1;}if(y0>sh-2){y0=sh-2;fy=1;}
+    var i00=(y0*sw+x0)*4,i10=i00+4,i01=i00+sw*4,i11=i01+4,o=(vv*W+uu)*4;
+    for(var ch=0;ch<3;ch++)od[o+ch]=(sd[i00+ch]*(1-fx)+sd[i10+ch]*fx)*(1-fy)+(sd[i01+ch]*(1-fx)+sd[i11+ch]*fx)*fy;
+    od[o+3]=255;
+  }
+  oc.putImageData(oi,0,0);return out;
+}
+var CROP={k:null,src:null,q:null,scale:1,ox:0,oy:0,drag:-1};
+var cropEl=document.getElementById("crop"),cropStage=document.getElementById("cropStage"),cropCv=document.getElementById("cropCv"),cropSvg=document.getElementById("cropSvg"),hnds=[].slice.call(document.querySelectorAll(".hnd"));
+function cropDefault(){var w=CROP.src.width,h=CROP.src.height,m=0.04;CROP.q=autoQuad(CROP.src)||[[w*m,h*m],[w*(1-m),h*m],[w*(1-m),h*(1-m)],[w*m,h*(1-m)]];}
+// Автопоиск документа: светлый лист на более тёмном фоне. Порог Оцу → самое большое светлое пятно → 4 крайние точки.
+function autoQuad(src){
+  try{
+    var S2=Math.min(1,320/Math.max(src.width,src.height)),W=Math.max(8,Math.round(src.width*S2)),H=Math.max(8,Math.round(src.height*S2));
+    var c=document.createElement("canvas");c.width=W;c.height=H;var x=c.getContext("2d");x.drawImage(src,0,0,W,H);
+    var d=x.getImageData(0,0,W,H).data,n=W*H,lum=new Uint8Array(n),hist=new Float64Array(256),i;
+    for(i=0;i<n;i++){lum[i]=(d[i*4]*299+d[i*4+1]*587+d[i*4+2]*114)/1000|0;hist[lum[i]]++;}
+    var sum=0,sumB=0,wB=0,best=0,thr=128;for(i=0;i<256;i++)sum+=i*hist[i];
+    for(i=0;i<256;i++){wB+=hist[i];if(!wB)continue;var wF=n-wB;if(!wF)break;sumB+=i*hist[i];var mB=sumB/wB,mF=(sum-sumB)/wF,v=wB*wF*(mB-mF)*(mB-mF);if(v>best){best=v;thr=i;}}
+    var lab=new Int32Array(n),stack=new Int32Array(n),bestId=0,bestN=0,id=0;
+    for(var p0=0;p0<n;p0++){if(lab[p0]||lum[p0]<=thr)continue;id++;var sp=0,cnt=0;stack[sp++]=p0;lab[p0]=id;
+      while(sp){var q=stack[--sp],qx=q%W,qy=(q/W)|0;cnt++;
+        if(qx>0&&!lab[q-1]&&lum[q-1]>thr){lab[q-1]=id;stack[sp++]=q-1;}
+        if(qx<W-1&&!lab[q+1]&&lum[q+1]>thr){lab[q+1]=id;stack[sp++]=q+1;}
+        if(qy>0&&!lab[q-W]&&lum[q-W]>thr){lab[q-W]=id;stack[sp++]=q-W;}
+        if(qy<H-1&&!lab[q+W]&&lum[q+W]>thr){lab[q+W]=id;stack[sp++]=q+W;}}
+      if(cnt>bestN){bestN=cnt;bestId=id;}}
+    if(bestN<n*0.12||bestN>n*0.96)return null; // документ не найден или он и есть весь кадр
+    var tl=null,tr=null,br=null,bl=null,a=1e9,b=-1e9,cc=-1e9,dd=1e9;
+    for(i=0;i<n;i++){if(lab[i]!==bestId)continue;var px=i%W,py=(i/W)|0,s1=px+py,s2=px-py;
+      if(s1<a){a=s1;tl=[px,py];}if(s1>b){b=s1;br=[px+1,py+1];}if(s2>cc){cc=s2;tr=[px+1,py];}if(s2<dd){dd=s2;bl=[px,py+1];}}
+    var k=1/S2;return [tl,tr,br,bl].map(function(pt){return [Math.min(src.width,pt[0]*k),Math.min(src.height,pt[1]*k)];});
+  }catch(e){return null;}
+}
+function openCrop(k,srcCanvas,quad){
+  CROP.k=k;CROP.src=srcCanvas;if(quad)CROP.q=quad.map(function(p){return p.slice();});else cropDefault();
+  cropEl.hidden=false;document.body.style.overflow="hidden";cropLayout();requestAnimationFrame(cropLayout);
+}
+function cropLayout(){
+  var r=cropStage.getBoundingClientRect(),pad=26,w=CROP.src.width,h=CROP.src.height;
+  var s=Math.min((r.width-pad*2)/w,(r.height-pad*2)/h);CROP.scale=s;CROP.ox=(r.width-w*s)/2;CROP.oy=(r.height-h*s)/2;
+  var dpr=window.devicePixelRatio||1;cropCv.width=Math.round(w*s*dpr);cropCv.height=Math.round(h*s*dpr);
+  cropCv.style.width=w*s+"px";cropCv.style.height=h*s+"px";cropCv.style.left=CROP.ox+"px";cropCv.style.top=CROP.oy+"px";
+  cropCv.getContext("2d").drawImage(CROP.src,0,0,cropCv.width,cropCv.height);cropDraw();
+}
+function cropDraw(){
+  var r=cropStage.getBoundingClientRect(),pts=CROP.q.map(function(p){return [CROP.ox+p[0]*CROP.scale,CROP.oy+p[1]*CROP.scale];});
+  var poly=pts.map(function(p){return p[0].toFixed(1)+","+p[1].toFixed(1);}).join(" ");
+  cropSvg.setAttribute("viewBox","0 0 "+r.width+" "+r.height);
+  cropSvg.innerHTML='<path fill="rgba(0,0,0,.55)" fill-rule="evenodd" d="M0 0H'+r.width+"V"+r.height+"H0Z M"+poly.replace(/ /g," L")+'Z"/><polygon points="'+poly+'" fill="none" stroke="#F0A01F" stroke-width="2.5"/>';
+  hnds.forEach(function(el,i){el.style.left=pts[i][0]+"px";el.style.top=pts[i][1]+"px";});
+}
+hnds.forEach(function(el,i){
+  el.addEventListener("pointerdown",function(e){e.preventDefault();CROP.drag=i;el.setPointerCapture(e.pointerId);});
+  el.addEventListener("pointermove",function(e){if(CROP.drag!==i)return;var r=cropStage.getBoundingClientRect();
+    var x=(e.clientX-r.left-CROP.ox)/CROP.scale,y=(e.clientY-r.top-CROP.oy)/CROP.scale;
+    CROP.q[i]=[Math.max(0,Math.min(CROP.src.width,x)),Math.max(0,Math.min(CROP.src.height,y))];cropDraw();});
+  el.addEventListener("pointerup",function(){CROP.drag=-1;});el.addEventListener("pointercancel",function(){CROP.drag=-1;});
+});
+function cropClose(){cropEl.hidden=true;document.body.style.overflow="";}
+document.getElementById("cropRot").addEventListener("click",function(){CROP.src=rotCanvas(CROP.src);cropDefault();cropLayout();});
+document.getElementById("cropAll").addEventListener("click",function(){var w=CROP.src.width,h=CROP.src.height;CROP.q=[[0,0],[w,0],[w,h],[0,h]];cropDraw();});
+document.getElementById("cropCancel").addEventListener("click",cropClose);
+document.getElementById("cropOk").addEventListener("click",function(){
+  var btn=this;btn.disabled=true;btn.textContent="Выпрямляю…";
+  setTimeout(function(){ // даём экрану обновиться
+    try{var out=warpQuad(CROP.src,CROP.q);S.photos[CROP.k]={canvas:out,src:CROP.src,quad:CROP.q.map(function(p){return p.slice();}),url:thumbUrl(out)};cropClose();render();}
+    catch(err){toast("Не удалось обработать фото: "+(err&&err.message||err),5000);}
+    btn.disabled=false;btn.textContent="Готово";
+  },30);
+});
+window.addEventListener("resize",function(){if(!cropEl.hidden)cropLayout();});
 
 /* ===== Пароль: вход и создание защищённой копии ===== */
 var lockEl=document.getElementById("lock"),lockPw=document.getElementById("lockPw"),lockPw2=document.getElementById("lockPw2"),lockPw2Row=document.getElementById("lockPw2Row"),

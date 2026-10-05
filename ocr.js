@@ -13,7 +13,26 @@
   var NUMFIX = { O: "0", Q: "0", D: "0", U: "0", I: "1", L: "1", T: "1", Z: "2", S: "5", G: "6", B: "8" };
   function fixNum(s) { return String(s).split("").map(function (c) { return NUMFIX[c] || c; }).join(""); }
   function decodeName(s) { return String(s).split("").map(function (c) { return MRZ_RU[c] || ""; }).join(""); }
-  function cleanLine(s) { return String(s).toUpperCase().replace(/«/g, "<<").replace(/\s+/g, "").replace(/[^A-Z0-9<]/g, "<"); }
+  // кириллические «двойники» латиницы → латиница (нейросеть знает оба алфавита)
+  var CYR2LAT = { "А": "A", "В": "B", "С": "C", "Е": "E", "Н": "H", "К": "K", "М": "M", "О": "O", "Р": "P", "Т": "T", "Х": "X", "У": "Y", "І": "I" };
+  function cleanLine(s) {
+    return String(s).toUpperCase().replace(/[АВСЕНКМОРТХУІ]/g, function (c) { return CYR2LAT[c]; })
+      .replace(/«/g, "<<").replace(/\s+/g, "").replace(/[^A-Z0-9<]/g, "<");
+  }
+  // В словах с русскими буквами латинские двойники — ошибка распознавания: «OТЧЕСТVO» → «ОТЧЕСТВО»
+  // похожие по виду (A→А, P→Р, H→Н…) + транслитерация для остальных (N→Н, V→В, I→И, R→Р…)
+  var LAT2CYR = { A: "А", B: "В", C: "С", E: "Е", H: "Н", K: "К", M: "М", O: "О", P: "Р", T: "Т", X: "Х", Y: "У",
+    V: "В", I: "И", N: "Н", R: "Р", S: "С", L: "Л", D: "Д", G: "Г", Z: "З", F: "Ф", U: "У",
+    a: "а", c: "с", e: "е", o: "о", p: "р", x: "х", y: "у" };
+  function fixMixedScript(text) {
+    return String(text || "").split("\n").map(function (line) {
+      if (/</.test(line) || /^[A-Z0-9<\s]{20,}$/.test(line)) return line; // машиночитаемая зона — не трогаем
+      return line.replace(/[A-Za-zА-Яа-яЁё0-9-]+/g, function (w) {
+        if (!/[А-Яа-яЁё]/.test(w) || !/[A-Za-z]/.test(w)) return w;
+        return w.replace(/[A-Za-z]/g, function (c) { return LAT2CYR[c] || c; });
+      });
+    }).join("\n");
+  }
   function yymmdd(s) {
     if (!/^\d{6}$/.test(s)) return "";
     var yy = +s.slice(0, 2), mm = +s.slice(2, 4), dd = +s.slice(4, 6);
@@ -22,6 +41,23 @@
     return pad(dd) + "." + pad(mm) + "." + (yy > cur ? 1900 + yy : 2000 + yy);
   }
 
+  /* ---------- восстановление «склеенных» цифр ----------
+     Нейросеть-«читалка» (CTC) иногда сливает одинаковые символы подряд: «780000» → «78000».
+     Перебираем, где мог быть повтор, и оставляем варианты, у которых сходится контрольная цифра. */
+  function expandDigits(str, len) {
+    if (str.length === len) return [str];
+    if (str.length > len) return [str.slice(str.length - len)];
+    if (len - str.length > 2) return [];
+    var out = {}, cur = [str];
+    while (cur.length && cur[0].length < len) {
+      var nx = {};
+      cur.forEach(function (c) { for (var i = 0; i < c.length; i++) nx[c.slice(0, i + 1) + c.slice(i)] = 1; });
+      cur = Object.keys(nx);
+    }
+    cur.forEach(function (c) { out[c] = 1; });
+    return Object.keys(out);
+  }
+  function validYMD(s) { var mm = +s.slice(2, 4), dd = +s.slice(4, 6); return /^\d{6}$/.test(s) && mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31; }
   function parseMRZ(text) {
     var lines = String(text || "").split(/\n/).map(cleanLine).filter(function (l) { return l.length >= 25; });
     var l1 = null, l2 = null, i, l;
@@ -30,21 +66,43 @@
     var res = { found: false, fields: {}, ok: {} };
     if (l2) {
       var idx = l2.search(/RU[S5]/);
-      var head = l2.slice(idx - 10, idx);
-      var num9 = fixNum(head.slice(0, 9)), c1 = fixNum(head.slice(9, 10));
-      var dob = fixNum(l2.slice(idx + 3, idx + 9)), c2 = fixNum(l2.slice(idx + 9, idx + 10));
-      var sex = l2.slice(idx + 10, idx + 11);
-      var opt = fixNum(l2.slice(idx + 18, idx + 31)) + "<";
-      var c3 = fixNum(l2.slice(idx + 32, idx + 33));
-      if (/^\d{9}$/.test(num9)) {
+      // До «RUS»: 9 цифр (3 цифры серии + номер) + контрольная. После: дата рождения 6 + контр., пол,
+      // заполнитель, доп. данные 13 цифр (посл. цифра серии + дата выдачи 6 + код подразделения 6), контр., итоговая контр.
+      var pre = fixNum(l2.slice(0, idx)).replace(/[^0-9]/g, "");
+      var after = l2.slice(idx + 3), sexPos = after.search(/[MF]/);
+      if (sexPos < 0 || sexPos > 9) sexPos = 7;
+      var dobRaw = fixNum(after.slice(0, sexPos)).replace(/[^0-9]/g, "");
+      var sex = after.charAt(sexPos);
+      var tm = /^<*([0-9A-Z]+)<+([0-9A-Z]*)/.exec(after.slice(sexPos + 1)) || ["", "", ""];
+      var optRaw = fixNum(tm[1]).replace(/[^0-9]/g, ""), endRaw = fixNum(tm[2]).replace(/[^0-9]/g, "");
+      var c3 = endRaw.charAt(0), comp = endRaw.charAt(1);
+      // варианты с верной контрольной цифрой
+      var numC = expandDigits(pre, 10).filter(function (c) { return checkDigit(c.slice(0, 9)) === c[9]; });
+      var dobC = expandDigits(dobRaw, 7).filter(function (c) { return validYMD(c.slice(0, 6)) && checkDigit(c.slice(0, 6)) === c[6]; });
+      var optAll = expandDigits(optRaw, 13).filter(function (c) { return validYMD(c.slice(1, 7)); });
+      var optC = c3 ? optAll.filter(function (c) { return checkDigit(c + "<") === c3; }) : [];
+      // итоговая контрольная цифра всей строки помогает выбрать один вариант
+      if (comp && (numC.length > 1 || dobC.length > 1 || optC.length > 1)) {
+        var combos = [];
+        numC.forEach(function (n) { dobC.forEach(function (d) { optC.forEach(function (o) {
+          if (checkDigit(n + d + "<<<<<<<" + o + "<" + c3) === comp) combos.push([n, d, o]);
+        }); }); });
+        if (combos.length === 1) { numC = [combos[0][0]]; dobC = [combos[0][1]]; optC = [combos[0][2]]; }
+      }
+      var num = numC.length ? numC[0] : (pre.length >= 9 ? pre.slice(-10).slice(0, 9) + "?" : "");
+      var dobS = dobC.length ? dobC[0] : dobRaw;
+      var opt = optC.length ? optC[0] : (optAll[0] || "");
+      if (/^\d{9}/.test(num)) {
         res.found = true;
-        var okNum = checkDigit(num9) === c1, okOpt = /^\d{13}/.test(opt) && checkDigit(opt) === c3;
-        res.fields.passNumber = num9.slice(3, 9); res.ok.passNumber = okNum;
-        if (/^\d/.test(opt)) { res.fields.passSeries = num9.slice(0, 3) + opt[0]; res.ok.passSeries = okNum && okOpt; }
-        var d = yymmdd(dob); if (d) { res.fields.dob = d; res.ok.dob = checkDigit(dob) === c2; }
-        var iss = yymmdd(opt.slice(1, 7)); if (iss) { res.fields.passIssueDate = iss; res.ok.passIssueDate = okOpt; }
+        var okNum = numC.length === 1, okOpt = optC.length === 1;
+        res.fields.passNumber = num.slice(3, 9); res.ok.passNumber = okNum;
+        if (/^\d/.test(opt)) { res.fields.passSeries = num.slice(0, 3) + opt[0]; res.ok.passSeries = okNum && okOpt; }
+        var d = yymmdd(dobS.slice(0, 6)); if (d) { res.fields.dob = d; res.ok.dob = dobC.length === 1; }
+        var iss = opt ? yymmdd(opt.slice(1, 7)) : ""; if (iss) { res.fields.passIssueDate = iss; res.ok.passIssueDate = okOpt; }
         if (/^\d{6}$/.test(opt.slice(7, 13))) { res.fields.passCode = opt.slice(7, 10) + "-" + opt.slice(10, 13); res.ok.passCode = okOpt; }
         if (sex === "M" || sex === "F") res.fields.sex = sex;
+        // если вариантов несколько — отдадим их, чтобы сверить с напечатанным текстом
+        if (optC.length > 1) res.optAlts = optC.map(function (o) { return { series: num.slice(0, 3) + o[0], issue: yymmdd(o.slice(1, 7)), code: o.slice(7, 10) + "-" + o.slice(10, 13) }; });
       }
     }
     if (l1) {
@@ -75,7 +133,9 @@
     return d[m][n];
   }
   // ok=true только если КАЖДАЯ часть ФИО из MRZ дословно есть в печатном тексте (два независимых источника совпали)
-  function reconcileFio(mrzFio, text) {
+  function reconcileFio(mrzFio, text, printedFio) {
+    var letters = function (x) { return String(x || "").replace(/[^А-ЯЁ]/g, ""); };
+    if (printedFio && printedFio.split(" ").length >= 2 && letters(printedFio) === letters(mrzFio)) return { fio: printedFio, ok: true };
     var set = {}; (String(text || "").toUpperCase().match(/[А-ЯЁ]{2,}/g) || []).forEach(function (w) { set[w] = 1; });
     var exact = true, out = String(mrzFio || "").split(" ").filter(Boolean).map(function (p) {
       if (set[p]) return p;
@@ -85,6 +145,28 @@
       return best && bd <= 2 ? best : p;
     });
     return { fio: out.join(" "), ok: exact && out.length >= 2 };
+  }
+
+
+  /* ---------- словарь типовых слов: «РОССИ» → «РОССИИ», «ФОР.» → «ГОР.» ---------- */
+  var VOCAB = ("РОССИИ РОССИЯ ОБЛАСТИ ОБЛАСТЬ САНКТ-ПЕТЕРБУРГУ САНКТ-ПЕТЕРБУРГ ЛЕНИНГРАДСКОЙ ЛЕНИНГРАДСКАЯ ЛЕНИНГРАД " +
+    "МОСКВЕ МОСКВА МОСКОВСКОЙ МОСКОВСКАЯ ОТДЕЛОМ ОТДЕЛЕНИЕМ ОТДЕЛЕНИЯ ОТДЕЛА УПРАВЛЕНИЕМ УПРАВЛЕНИЯ МИЛИЦИИ ПОЛИЦИИ " +
+    "РАЙОНА РАЙОНЕ РАЙОНУ РАЙОН ПЕТРОГРАДСКОГО ВЫБОРГСКОГО ВСЕВОЛОЖСКОГО ВСЕВОЛОЖСКИЙ ВСЕВОЛОЖСК КАЛИНИНСКОГО ПРИМОРСКОГО " +
+    "НЕВСКОГО КРАСНОГВАРДЕЙСКОГО КИРОВСКОГО МОСКОВСКОГО ФРУНЗЕНСКОГО АДМИРАЛТЕЙСКОГО ЦЕНТРАЛЬНОГО ВАСИЛЕОСТРОВСКОГО " +
+    "КРАСНОСЕЛЬСКОГО КОЛПИНСКОГО ПУШКИНСКОГО ПЕТРОДВОРЦОВОГО КУРОРТНОГО КРОНШТАДТСКОГО ФЕДЕРАЛЬНОЙ МИГРАЦИОННОЙ СЛУЖБЫ " +
+    "ВНУТРЕННИХ ТЕРРИТОРИАЛЬНЫМ ПУНКТОМ ГОРОДА ГОРОДЕ ГОРОДУ РЕСПУБЛИКИ РЕСПУБЛИКА КРАЯ УЛИЦА ПРОСПЕКТ ПЕРЕУЛОК " +
+    "КВАРТИРА КОРПУС СТРОЕНИЕ ЛИТЕРА ПОСЕЛОК ДЕРЕВНЯ ТЕРРИТОРИЯ ГУВМ УФМС").split(" ");
+  var VOCAB_SET = {}; VOCAB.forEach(function (w) { VOCAB_SET[w] = 1; });
+  var VOCAB_SHORT = { "ФОР.": "ГОР.", "Г0Р.": "ГОР.", "ГОР,": "ГОР.", "0БЛ.": "ОБЛ.", "ОБП.": "ОБЛ." };
+  function fixVocab(text) {
+    return String(text || "").split(" ").map(function (tok) {
+      if (VOCAB_SHORT[tok]) return VOCAB_SHORT[tok];
+      var m = /^([А-ЯЁ-]+)([.,]?)$/.exec(tok);
+      if (!m || m[1].length < 5 || VOCAB_SET[m[1]]) return tok;
+      // при равенстве — первое слово словаря (родительный падеж стоит первым: «ГУ МВД РОССИИ ПО … ОБЛАСТИ»)
+      for (var i = 0; i < VOCAB.length; i++) if (Math.abs(VOCAB[i].length - m[1].length) <= 1 && lev(m[1], VOCAB[i]) <= 1) return VOCAB[i] + m[2];
+      return tok;
+    }).join(" ");
   }
 
   function tidy(s) { return String(s).replace(/\s+/g, " ").replace(/[^А-ЯЁA-Z0-9 .,\-«»"()№/]/gi, "").replace(/^[\s.,\-]+|[\s,\-]+$/g, "").trim(); }
@@ -141,29 +223,34 @@
   }
 
   /* ---------- подготовка изображения ---------- */
-  async function prepImage(file, rot, crop) {
-    var bmp = null;
-    if (typeof createImageBitmap === "function") {
-      try { bmp = await createImageBitmap(file, { imageOrientation: "from-image" }); } catch (e) { try { bmp = await createImageBitmap(file); } catch (e2) { bmp = null; } }
-    }
-    if (!bmp) { // запасной путь для старых iPhone/Safari
-      var url = URL.createObjectURL(file), img = new Image();
-      img.src = url;
-      await (img.decode ? img.decode() : new Promise(function (ok, bad) { img.onload = ok; img.onerror = bad; }));
-      URL.revokeObjectURL(url); bmp = img;
+  // src — файл с камеры или уже обрезанный canvas; color=true — без перевода в ч/б (для нейросети)
+  async function prepImage(src, rot, crop, color) {
+    var bmp = null, isCanvas = typeof HTMLCanvasElement !== "undefined" && src instanceof HTMLCanvasElement;
+    if (isCanvas) bmp = src;
+    else {
+      if (typeof createImageBitmap === "function") {
+        try { bmp = await createImageBitmap(src, { imageOrientation: "from-image" }); } catch (e) { try { bmp = await createImageBitmap(src); } catch (e2) { bmp = null; } }
+      }
+      if (!bmp) { // запасной путь для старых iPhone/Safari
+        var url = URL.createObjectURL(src), img = new Image();
+        img.src = url;
+        await (img.decode ? img.decode() : new Promise(function (ok, bad) { img.onload = ok; img.onerror = bad; }));
+        URL.revokeObjectURL(url); bmp = img;
+      }
     }
     var w = bmp.naturalWidth || bmp.width, h = bmp.naturalHeight || bmp.height, r = ((rot || 0) % 360 + 360) % 360, swap = r === 90 || r === 270;
     var scale = Math.min(1, 2200 / Math.max(w, h));
     var cw = Math.round((swap ? h : w) * scale), ch = Math.round((swap ? w : h) * scale);
     var c = document.createElement("canvas"); c.width = cw; c.height = ch;
     var x = c.getContext("2d"); x.translate(cw / 2, ch / 2); x.rotate(r * Math.PI / 180); x.drawImage(bmp, -w * scale / 2, -h * scale / 2, w * scale, h * scale);
-    if (bmp.close) bmp.close();
+    if (!isCanvas && bmp.close) bmp.close();
     var out = c;
     if (crop) {
       var y0 = Math.round(ch * crop.y0), y1 = Math.round(ch * crop.y1), up = crop.up || 1;
       var cc = document.createElement("canvas"); cc.width = Math.round(cw * up); cc.height = Math.round((y1 - y0) * up);
       cc.getContext("2d").drawImage(c, 0, y0, cw, y1 - y0, 0, 0, cc.width, cc.height); out = cc;
     }
+    if (color) return out;
     var ctx = out.getContext("2d"), im = ctx.getImageData(0, 0, out.width, out.height), d = im.data, hist = new Uint32Array(256), i;
     for (i = 0; i < d.length; i += 4) { var lum = (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000 | 0; d[i] = lum; hist[lum]++; }
     var total = d.length / 4, lo = 0, hi = 255, acc = 0;
@@ -190,39 +277,62 @@
   async function readRus(canvas) { return (await wRus.recognize(canvas)).data.text || ""; }
   async function readMrz(canvas) { return (await wMrz.recognize(canvas)).data.text || ""; }
 
-  // photos: {passport:{file,rot}, reg:{file,rot}, lic:{file,rot}}; step(label, fraction)
+  // photos: {passport:{canvas|file,rot}, reg:…, lic:…}; step(label, fraction)
+  // Сначала нейросеть PaddleOCR (точнее), при сбое — Tesseract.
   async function scan(photos, step) {
-    onProg = function (label, p) { step(label, p); };
-    step("Подготовка…", 0.02);
-    await init();
-    var out = { fields: {}, ok: {}, regLines: [], notes: [] };
+    var out = { fields: {}, ok: {}, regLines: [], notes: [], engine: "paddle" };
     function put(src, okmap) { for (var k in src) if (src[k] && !out.fields[k]) { out.fields[k] = src[k]; out.ok[k] = !!(okmap && okmap[k]); } }
-    if (photos.passport && photos.passport.file) {
-      step("Ищу машиночитаемую зону паспорта…", null);
-      var mrz = parseMRZ(await readMrz(await prepImage(photos.passport.file, photos.passport.rot, { y0: 0.62, y1: 1, up: 1 })));
-      if (!mrz.found) mrz = parseMRZ(await readMrz(await prepImage(photos.passport.file, photos.passport.rot)));
-      step("Читаю паспорт…", null);
-      var ptxt = await readRus(await prepImage(photos.passport.file, photos.passport.rot));
-      var pt = parsePassportText(ptxt);
-      if (mrz.fields.fio) { var rc = reconcileFio(mrz.fields.fio, ptxt); mrz.fields.fio = rc.fio; mrz.ok.fio = rc.ok; }
+    function has(ph) { return ph && (ph.canvas || ph.file); }
+    function src(ph) { return ph.canvas || ph.file; }
+    function rot(ph) { return ph.canvas ? 0 : ph.rot; }
+    step("Подготовка…", 0.02);
+    if (root.Paddle) {
+      try { await root.Paddle.init(step); }
+      catch (e) { out.engine = "tess"; out.notes.push("Нейросеть не загрузилась (" + (e && e.message || e) + ") — использован простой движок."); }
+    } else out.engine = "tess";
+    if (out.engine === "tess") { onProg = function (label, p) { step(label, p); }; await init(); }
+
+    async function read(ph, label, crop) {
+      step(label, null);
+      if (out.engine === "paddle") {
+        var r = await root.Paddle.recognize(await prepImage(src(ph), rot(ph), crop, true), function (l, p) { step(label + " " + l.replace(/^[^…]*… ?/, ""), p); });
+        return { text: fixMixedScript(r.text), raw: r.text };
+      }
+      var t = await readRus(await prepImage(src(ph), rot(ph), crop));
+      return { text: t, raw: t };
+    }
+
+    if (has(photos.passport)) {
+      var P = photos.passport, rp = await read(P, "Читаю паспорт…"), mrz = parseMRZ(rp.raw);
+      if (!mrz.found) { // вторая попытка: нижняя часть разворота крупнее
+        step("Ищу машиночитаемую зону паспорта…", null);
+        if (out.engine === "paddle") mrz = parseMRZ((await read(P, "Ищу строки <<< внизу паспорта…", { y0: 0.6, y1: 1, up: 1.6 })).raw);
+        else mrz = parseMRZ(await readMrz(await prepImage(src(P), rot(P), { y0: 0.62, y1: 1, up: 1 })));
+      }
+      var pt = parsePassportText(rp.text);
+      if (pt.passIssuedBy) pt.passIssuedBy = fixVocab(pt.passIssuedBy);
+      if (pt.birthPlace) pt.birthPlace = fixVocab(pt.birthPlace);
+      if (mrz.fields.fio) { var rc = reconcileFio(mrz.fields.fio, rp.text, pt.fio); mrz.fields.fio = rc.fio; mrz.ok.fio = rc.ok; }
+      if (mrz.optAlts && (pt.passCode || pt.passIssueDate)) { // несколько вариантов — выбираем совпавший с напечатанным
+        var hit = mrz.optAlts.filter(function (a) { return (!pt.passCode || a.code === pt.passCode) && (!pt.passIssueDate || a.issue === pt.passIssueDate); });
+        if (hit.length === 1) { mrz.fields.passSeries = hit[0].series; mrz.fields.passIssueDate = hit[0].issue; mrz.fields.passCode = hit[0].code;
+          mrz.ok.passSeries = mrz.ok.passNumber; mrz.ok.passIssueDate = true; mrz.ok.passCode = true; }
+      }
       put(mrz.fields, mrz.ok); put(pt, null);
-      if (!mrz.found) out.notes.push("Машиночитаемая зона паспорта не найдена — сфотографируй разворот с фото целиком, ровно и без бликов.");
+      if (!mrz.found) out.notes.push("Машиночитаемая зона паспорта не найдена — сфотографируй разворот целиком, вместе с двумя строками «<<<» внизу, ровно и без бликов.");
     }
-    if (photos.reg && photos.reg.file) {
-      step("Читаю прописку…", null);
-      var rg = parseRegistration(await readRus(await prepImage(photos.reg.file, photos.reg.rot)));
-      out.regLines = rg.lines; if (rg.address) put({ address: rg.address }, null);
+    if (has(photos.reg)) {
+      var rg = parseRegistration((await read(photos.reg, "Читаю прописку…")).text);
+      out.regLines = rg.lines; if (rg.address) put({ address: fixVocab(rg.address) }, null);
     }
-    if (photos.lic && photos.lic.file) {
-      step("Читаю водительское удостоверение…", null);
-      var lic = parseLicense(await readRus(await prepImage(photos.lic.file, photos.lic.rot)), out.fields.dob);
-      put(lic, null);
+    if (has(photos.lic)) {
+      put(parseLicense((await read(photos.lic, "Читаю водительское удостоверение…")).text, out.fields.dob), null);
     }
     step("Готово", 1);
     return out;
   }
 
-  var api = { reconcileFio: reconcileFio, parseMRZ: parseMRZ, parsePassportText: parsePassportText, parseRegistration: parseRegistration, parseLicense: parseLicense, checkDigit: checkDigit, decodeName: decodeName, RU_MRZ: RU_MRZ, scan: scan, prepImage: prepImage };
+  var api = { fixVocab: fixVocab, expandDigits: expandDigits, fixMixedScript: fixMixedScript, reconcileFio: reconcileFio, parseMRZ: parseMRZ, parsePassportText: parsePassportText, parseRegistration: parseRegistration, parseLicense: parseLicense, checkDigit: checkDigit, decodeName: decodeName, RU_MRZ: RU_MRZ, scan: scan, prepImage: prepImage };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.OCR = api;
 })(typeof window !== "undefined" ? window : globalThis);
